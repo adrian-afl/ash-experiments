@@ -1,15 +1,16 @@
 use crate::device::VEDevice;
 use ash::vk;
+use std::sync::Arc;
 
-pub struct VEMainDeviceQueue<'a> {
-    device: &'a VEDevice,
+pub struct VEMainDeviceQueue {
+    device: Arc<VEDevice>,
     pub main_queue: vk::Queue,
 }
 
-impl<'a> VEMainDeviceQueue<'a> {
-    pub fn new(device: &'a VEDevice) -> VEMainDeviceQueue {
+impl VEMainDeviceQueue {
+    pub fn new(device: Arc<VEDevice>) -> VEMainDeviceQueue {
         VEMainDeviceQueue {
-            device,
+            device: device.clone(),
             main_queue: unsafe { device.device.get_device_queue(device.queue_family_index, 0) },
         }
     }

@@ -1,19 +1,16 @@
 use crate::buffer::VEBuffer;
 use crate::command_buffer::VECommandBuffer;
 use crate::device::VEDevice;
+use std::sync::Arc;
 
-pub struct VEVertexBuffer<'dev, 'mem, 'buf> {
-    device: &'dev VEDevice,
-    pub buffer: &'buf VEBuffer<'dev, 'mem>,
+pub struct VEVertexBuffer {
+    device: Arc<VEDevice>,
+    pub buffer: VEBuffer,
     pub vertex_count: u32,
 }
 
-impl<'dev, 'mem, 'buf> VEVertexBuffer<'dev, 'mem, 'buf> {
-    pub fn new(
-        device: &'dev VEDevice,
-        buffer: &'buf VEBuffer<'dev, 'mem>,
-        vertex_count: u32,
-    ) -> VEVertexBuffer<'dev, 'mem, 'buf> {
+impl<'dev, 'mem, 'buf> VEVertexBuffer {
+    pub fn new(device: Arc<VEDevice>, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
         VEVertexBuffer {
             device,
             buffer,

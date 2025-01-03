@@ -4,24 +4,22 @@ use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk::{
     Buffer, BufferCreateInfo, BufferUsageFlags, DeviceSize, MemoryPropertyFlags, SharingMode,
 };
+use std::sync::{Arc, Mutex};
 
-pub struct VEBuffer<'dev, 'mem> {
-    device: &'dev VEDevice,
-    memory_manager: &'mem mut VEMemoryManager<'dev>,
+pub struct VEBuffer {
+    device: Arc<VEDevice>,
+    memory_manager: Arc<Mutex<VEMemoryManager>>,
     allocation: VESingleAllocation,
     pub buffer: Buffer,
 }
 
-impl<'dev, 'mem> VEBuffer<'dev, 'mem> {
+impl VEBuffer {
     pub fn new(
-        device: &'dev VEDevice,
-        memory_manager: &'mem mut VEMemoryManager<'dev>,
+        device: Arc<VEDevice>,
+        memory_manager: Arc<Mutex<VEMemoryManager>>,
         size: DeviceSize,
         usage: BufferUsageFlags,
-    ) -> VEBuffer<'dev, 'mem>
-    where
-        'mem: 'dev,
-    {
+    ) -> VEBuffer {
         unsafe {
             let buffer = device
                 .device
@@ -41,7 +39,12 @@ impl<'dev, 'mem> VEBuffer<'dev, 'mem> {
             );
 
             // allocate the memory, in a sub-scope so borrow is dropped
-            let allocation = { memory_manager.bind_buffer_memory(mem_index, buffer, size) };
+            let allocation = {
+                memory_manager
+                    .lock()
+                    .unwrap()
+                    .bind_buffer_memory(mem_index, buffer, size)
+            };
 
             // return the VEBuffer
             VEBuffer {
@@ -54,16 +57,19 @@ impl<'dev, 'mem> VEBuffer<'dev, 'mem> {
     }
 
     pub fn map(&mut self) -> *mut core::ffi::c_void {
-        self.memory_manager.map(&self.allocation)
+        self.memory_manager.lock().unwrap().map(&self.allocation)
     }
 
     pub fn unmap(&mut self) {
-        self.memory_manager.unmap(&self.allocation)
+        self.memory_manager.lock().unwrap().unmap(&self.allocation)
     }
 }
 
-impl<'dev, 'mem> Drop for VEBuffer<'dev, 'mem> {
+impl Drop for VEBuffer {
     fn drop(&mut self) {
-        self.memory_manager.free_allocation(&self.allocation);
+        self.memory_manager
+            .lock()
+            .unwrap()
+            .free_allocation(&self.allocation);
     }
 }

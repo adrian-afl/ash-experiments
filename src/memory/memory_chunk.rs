@@ -1,5 +1,6 @@
 use crate::device::VEDevice;
 use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, MemoryMapFlags};
+use std::sync::Arc;
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -11,17 +12,17 @@ pub struct VESingleAllocation {
     pub offset: u64,
 }
 
-pub struct VEMemoryChunk<'dev> {
+pub struct VEMemoryChunk {
     pub chunk_identifier: u64,
-    device: &'dev VEDevice,
+    device: Arc<VEDevice>,
     pub allocations: Vec<VESingleAllocation>,
     pub handle: DeviceMemory,
     identifier_counter: u64,
 }
 
-impl<'a> VEMemoryChunk<'a> {
+impl VEMemoryChunk {
     pub fn new(
-        device: &'a VEDevice,
+        device: Arc<VEDevice>,
         chunk_identifier: u64,
         memory_type_index: u32,
     ) -> VEMemoryChunk {
@@ -55,7 +56,7 @@ impl<'a> VEMemoryChunk<'a> {
     }
 
     pub fn bind_buffer_memory(
-        &'a mut self,
+        &mut self,
         buffer: Buffer,
         size: u64,
         offset: u64,
@@ -79,7 +80,7 @@ impl<'a> VEMemoryChunk<'a> {
     }
 
     pub fn bind_image_memory(
-        &'a mut self,
+        &mut self,
         image: Image,
         size: u64,
         offset: u64,
@@ -157,7 +158,7 @@ impl<'a> VEMemoryChunk<'a> {
     }
 }
 
-impl<'a> Drop for VEMemoryChunk<'a> {
+impl Drop for VEMemoryChunk {
     fn drop(&mut self) {
         unsafe { self.device.device.free_memory(self.handle, None) };
     }

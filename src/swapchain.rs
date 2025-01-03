@@ -3,14 +3,15 @@ use crate::window::VEWindow;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::SwapchainKHR;
+use std::sync::Arc;
 
-pub struct VESwapchain<'a> {
-    device: &'a VEDevice,
+pub struct VESwapchain {
+    device: Arc<VEDevice>,
     pub swapchain: SwapchainKHR,
 }
 
-impl<'a> VESwapchain<'a> {
-    pub fn new(window: &VEWindow, device: &'a VEDevice) -> VESwapchain<'a> {
+impl VESwapchain {
+    pub fn new(window: &VEWindow, device: Arc<VEDevice>) -> VESwapchain {
         let surface_format = unsafe {
             device
                 .surface_loader

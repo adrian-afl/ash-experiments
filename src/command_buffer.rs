@@ -1,16 +1,17 @@
 use crate::command_pool::VECommandPool;
 use crate::device::VEDevice;
 use ash::vk::{CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel};
+use std::sync::Arc;
 
-pub struct VECommandBuffer<'a> {
-    device: &'a VEDevice,
+pub struct VECommandBuffer {
+    device: Arc<VEDevice>,
     pub handle: CommandBuffer,
 }
 
-impl<'a> VECommandBuffer<'a> {
-    pub fn new(device: &'a VEDevice, command_pool: &VECommandPool) -> VECommandBuffer<'a> {
+impl<'a> VECommandBuffer {
+    pub fn new(device: Arc<VEDevice>, command_pool: &VECommandPool) -> VECommandBuffer {
         VECommandBuffer {
-            device,
+            device: device.clone(),
             handle: unsafe {
                 device
                     .device

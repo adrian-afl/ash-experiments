@@ -1,17 +1,17 @@
-use crate::buffer::VEBuffer;
 use crate::device::VEDevice;
 use crate::memory::memory_chunk::{VEMemoryChunk, VESingleAllocation};
-use ash::vk::{Buffer, Image, MemoryMapFlags};
+use ash::vk::{Buffer, Image};
 use std::collections::HashMap;
+use std::sync::Arc;
 
-pub struct VEMemoryManager<'dev> {
-    device: &'dev VEDevice,
-    chunks: HashMap<u32, Vec<VEMemoryChunk<'dev>>>,
+pub struct VEMemoryManager {
+    device: Arc<VEDevice>,
+    chunks: HashMap<u32, Vec<VEMemoryChunk>>,
     identifier_counter: u64,
 }
 
-impl<'dev> VEMemoryManager<'dev> {
-    pub fn new(device: &'dev VEDevice) -> VEMemoryManager<'dev> {
+impl VEMemoryManager {
+    pub fn new(device: Arc<VEDevice>) -> VEMemoryManager {
         VEMemoryManager {
             device,
             chunks: HashMap::new(),
@@ -20,7 +20,7 @@ impl<'dev> VEMemoryManager<'dev> {
     }
 
     pub fn bind_buffer_memory(
-        &'dev mut self,
+        &mut self,
         memory_type_index: u32,
         buffer: Buffer,
         size: u64,
@@ -30,7 +30,7 @@ impl<'dev> VEMemoryManager<'dev> {
     }
 
     pub fn bind_image_memory(
-        &'dev mut self,
+        &mut self,
         memory_type_index: u32,
         image: Image,
         size: u64,
@@ -39,11 +39,7 @@ impl<'dev> VEMemoryManager<'dev> {
         free.0.bind_image_memory(image, size, free.1)
     }
 
-    fn find_free(
-        &'dev mut self,
-        memory_type_index: u32,
-        size: u64,
-    ) -> (&mut VEMemoryChunk<'dev>, u64) {
+    fn find_free(&mut self, memory_type_index: u32, size: u64) -> (&mut VEMemoryChunk, u64) {
         if (!self.chunks.contains_key(&memory_type_index)) {
             self.chunks.insert(memory_type_index, vec![]);
         }
@@ -58,7 +54,11 @@ impl<'dev> VEMemoryManager<'dev> {
 
         // no suitable chunk found, allocate
         self.identifier_counter += 1;
-        let chunk = VEMemoryChunk::new(self.device, self.identifier_counter, memory_type_index);
+        let chunk = VEMemoryChunk::new(
+            self.device.clone(),
+            self.identifier_counter,
+            memory_type_index,
+        );
         chunks_for_type.push(chunk);
         (chunks_for_type.last_mut().unwrap(), 0)
     }
