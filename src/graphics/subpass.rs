@@ -16,7 +16,7 @@ pub fn create_subpass_attachment_reference(index: i32, depth: bool) -> vk::Attac
     vk::AttachmentReference::default()
         .attachment(index as u32)
         .layout(if depth {
-            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL
+            vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         } else {
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
         })

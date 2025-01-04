@@ -46,10 +46,6 @@ impl VEOutputStage {
         let mut render_stages = vec![];
         for i in 0..swapchain_locked.present_images.len() {
             let mut attachments = vec![];
-            match depth_attachment {
-                None => (),
-                Some(depth_attachment) => attachments.push(depth_attachment),
-            }
             let image = Arc::new(VEImage::from_swapchain_present_image(
                 device.clone(),
                 queue.clone(),
@@ -63,6 +59,12 @@ impl VEOutputStage {
             ));
             let color_atta = VEAttachment::from_image(image, None, clear_color, true);
             attachments.push(&color_atta);
+
+            match depth_attachment {
+                None => (),
+                Some(depth_attachment) => attachments.push(depth_attachment),
+            }
+
             render_stages.push(VERenderStage::new(
                 device.clone(),
                 swapchain_locked.width,

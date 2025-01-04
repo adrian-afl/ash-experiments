@@ -7,6 +7,7 @@ mod memory;
 mod window;
 
 use crate::buffer::buffer::{VEBuffer, VEBufferType};
+use crate::graphics::attachment::VEAttachment;
 use crate::graphics::vertex_buffer::VEVertexBuffer;
 use crate::image::image::VEImage;
 use crate::image::sampler::VESampler;
@@ -37,6 +38,8 @@ use window::output_stage::VEOutputStage;
 async fn main() {
     env_logger::init();
     let window = VEWindow::new();
+    let width = window.window.inner_size().width;
+    let height = window.window.inner_size().height;
     let device = Arc::new(VEDevice::new(&window));
     {
         let command_pool = Arc::new(VECommandPool::new(device.clone()));
@@ -135,6 +138,32 @@ async fn main() {
                 let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
                 // descriptor_set.bind_buffer(0, &buffer);
 
+                let depth_buffer = Arc::new(VEImage::from_full(
+                    device.clone(),
+                    main_device_queue.clone(),
+                    command_pool.clone(),
+                    memory_manager.clone(),
+                    width,
+                    height,
+                    1,
+                    vk::Format::D32_SFLOAT,
+                    vk::ImageTiling::OPTIMAL,
+                    vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+                    vk::MemoryPropertyFlags::empty(),
+                ));
+
+                let depth_attachment = VEAttachment::from_image(
+                    depth_buffer,
+                    None,
+                    Some(vk::ClearValue {
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    }),
+                    false,
+                );
+
                 let mut output_stage = VEOutputStage::new(
                     device.clone(),
                     main_device_queue.clone(),
@@ -146,7 +175,7 @@ async fn main() {
                             float32: [0.0, 0.0, 1.0, 1.0],
                         },
                     }),
-                    None,
+                    Some(&depth_attachment),
                     &[&descriptor_set_layout],
                     &vertex_shader,
                     &fragment_shader,
