@@ -1,5 +1,5 @@
-use crate::attachment::VEAttachment;
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
+use crate::graphics::attachment::VEAttachment;
 use ash::vk;
 use std::sync::Arc;
 

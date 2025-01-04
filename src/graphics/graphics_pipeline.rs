@@ -1,9 +1,11 @@
-use crate::attachment::{AttachmentBlending, VEAttachment};
-use crate::descriptor_set_layout::VEDescriptorSetLayout;
-use crate::device::VEDevice;
-use crate::renderpass::VERenderPass;
-use crate::shader_module::VEShaderModule;
-use crate::vertex_attributes::{create_vertex_input_state_descriptions, VertexAttribFormat};
+use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
+use crate::core::device::VEDevice;
+use crate::core::shader_module::VEShaderModule;
+use crate::graphics::attachment::{AttachmentBlending, VEAttachment};
+use crate::graphics::renderpass::VERenderPass;
+use crate::graphics::vertex_attributes::{
+    create_vertex_input_state_descriptions, VertexAttribFormat,
+};
 use ash::vk;
 use ash::vk::{ColorComponentFlags, PrimitiveTopology, RenderPass};
 use std::sync::Arc;
@@ -54,9 +56,9 @@ impl VEGraphicsPipeline {
 
         let viewport = vk::Viewport::default()
             .x(0.0)
-            .y(0.0)
+            .y(viewport_height as f32)
             .width(viewport_width as f32)
-            .height(viewport_height as f32)
+            .height(-(viewport_height as f32))
             .min_depth(0.0)
             .max_depth(1.0);
 

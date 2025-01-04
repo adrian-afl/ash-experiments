@@ -1,55 +1,37 @@
-mod attachment;
 mod buffer;
-mod command_buffer;
-mod command_pool;
-mod compute_pipeline;
-mod compute_stage;
-mod descriptor_set;
-mod descriptor_set_layout;
-mod device;
-mod framebuffer;
-mod graphics_pipeline;
+mod compute;
+mod core;
+mod graphics;
 mod image;
-mod load_vertex_buffer_from_file;
-mod main_device_queue;
 mod memory;
-mod output_stage;
-mod render_stage;
-mod renderpass;
-mod semaphore;
-mod shader_module;
-mod subpass;
-mod swapchain;
-mod vertex_attributes;
-mod vertex_buffer;
 mod window;
 
-use crate::buffer::{VEBuffer, VEBufferType};
-use crate::command_buffer::VECommandBuffer;
-use crate::command_pool::VECommandPool;
-use crate::compute_stage::VEComputeStage;
-use crate::descriptor_set_layout::{
+use crate::buffer::buffer::{VEBuffer, VEBufferType};
+use crate::graphics::vertex_buffer::VEVertexBuffer;
+use crate::image::image::VEImage;
+use crate::image::sampler::VESampler;
+use crate::memory::memory_manager::VEMemoryManager;
+use crate::window::swapchain::VESwapchain;
+use crate::window::window::VEWindow;
+use ash::vk;
+use compute::compute_stage::VEComputeStage;
+use core::command_buffer::VECommandBuffer;
+use core::command_pool::VECommandPool;
+use core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
     VEDescriptorSetLayoutField,
 };
-use crate::device::VEDevice;
-use crate::load_vertex_buffer_from_file::load_vertex_buffer_from_file;
-use crate::main_device_queue::VEMainDeviceQueue;
-use crate::memory::memory_manager::VEMemoryManager;
-use crate::output_stage::VEOutputStage;
-use crate::render_stage::CullMode;
-use crate::shader_module::{VEShaderModule, VEShaderModuleType};
-use crate::swapchain::VESwapchain;
-use crate::vertex_attributes::VertexAttribFormat;
-use crate::vertex_buffer::VEVertexBuffer;
-use crate::window::VEWindow;
-use ash::vk;
-use ash::vk::BufferUsageFlags;
+use core::device::VEDevice;
+use core::main_device_queue::VEMainDeviceQueue;
+use core::shader_module::{VEShaderModule, VEShaderModuleType};
+use graphics::render_stage::CullMode;
+use graphics::vertex_attributes::VertexAttribFormat;
 use std::fs;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 use tokio::main;
+use window::output_stage::VEOutputStage;
 
 #[main]
 async fn main() {
@@ -138,6 +120,18 @@ async fn main() {
                     VEShaderModuleType::Compute,
                 );
 
+                let mut descriptor_set_layout = VEDescriptorSetLayout::new(
+                    device.clone(),
+                    &[VEDescriptorSetLayoutField {
+                        binding: 0,
+                        typ: VEDescriptorSetFieldType::Sampler,
+                        stage: VEDescriptorSetFieldStage::Fragment,
+                    }],
+                );
+
+                let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
+                descriptor_set.bind_buffer(0, &buffer);
+
                 let mut output_stage = VEOutputStage::new(
                     device.clone(),
                     main_device_queue.clone(),
@@ -150,7 +144,7 @@ async fn main() {
                         },
                     }),
                     None,
-                    &[],
+                    &[&descriptor_set_layout],
                     &vertex_shader,
                     &fragment_shader,
                     &[
@@ -163,16 +157,36 @@ async fn main() {
                     CullMode::None,
                 );
 
-                let vertex_buffer = load_vertex_buffer_from_file(
+                let vertex_buffer = VEVertexBuffer::from_file(
                     device.clone(),
                     memory_manager.clone(),
                     "dingus.raw",
                     3 * 4 + 3 * 4 + 2 * 4 + 4 * 4,
                 );
 
+                let texture = VEImage::from_file(
+                    device.clone(),
+                    main_device_queue.clone(),
+                    command_pool.clone(),
+                    memory_manager.clone(),
+                    "dingus.jpg",
+                    vk::ImageUsageFlags::SAMPLED,
+                );
+
+                let sampler = VESampler::new(
+                    device.clone(),
+                    vk::SamplerAddressMode::REPEAT,
+                    vk::Filter::LINEAR,
+                    vk::Filter::LINEAR,
+                    false,
+                );
+
+                descriptor_set.bind_image_sampler(0, &texture, &sampler);
+
                 output_stage.next_image();
                 output_stage.begin_recording(&command_buffer);
 
+                output_stage.set_descriptor_set(&command_buffer, 0, descriptor_set);
                 vertex_buffer.draw_instanced(&command_buffer, 1);
 
                 output_stage.end_recording(&command_buffer);

@@ -1,6 +1,6 @@
-use crate::descriptor_set_layout::VEDescriptorSetLayout;
-use crate::device::VEDevice;
-use crate::shader_module::VEShaderModule;
+use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
+use crate::core::device::VEDevice;
+use crate::core::shader_module::VEShaderModule;
 use ash::vk;
 use std::sync::Arc;
 

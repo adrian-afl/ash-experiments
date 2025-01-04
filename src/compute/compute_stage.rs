@@ -1,9 +1,9 @@
-use crate::command_buffer::VECommandBuffer;
-use crate::compute_pipeline::VEComputePipeline;
-use crate::descriptor_set::VEDescriptorSet;
-use crate::descriptor_set_layout::VEDescriptorSetLayout;
-use crate::device::VEDevice;
-use crate::shader_module::VEShaderModule;
+use crate::compute::compute_pipeline::VEComputePipeline;
+use crate::core::command_buffer::VECommandBuffer;
+use crate::core::descriptor_set::VEDescriptorSet;
+use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
+use crate::core::device::VEDevice;
+use crate::core::shader_module::VEShaderModule;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
 use std::sync::Arc;

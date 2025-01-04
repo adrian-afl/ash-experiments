@@ -1,4 +1,4 @@
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 

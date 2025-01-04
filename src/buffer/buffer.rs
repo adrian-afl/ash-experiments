@@ -1,10 +1,8 @@
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
 use crate::memory::memory_chunk::VESingleAllocation;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
-use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceSize, MemoryPropertyFlags, SharingMode,
-};
+use ash::vk::{Buffer, BufferCreateInfo, DeviceSize, MemoryPropertyFlags, SharingMode};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]

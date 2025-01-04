@@ -1,7 +1,7 @@
-use crate::command_pool::VECommandPool;
-use crate::device::VEDevice;
-use crate::main_device_queue::VEMainDeviceQueue;
-use crate::semaphore::VESemaphore;
+use crate::core::command_pool::VECommandPool;
+use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::semaphore::VESemaphore;
 use ash::vk;
 use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandBufferUsageFlags,

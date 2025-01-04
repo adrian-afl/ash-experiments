@@ -1,4 +1,4 @@
-use crate::window::VEWindow;
+use crate::window::window::VEWindow;
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::vk::{

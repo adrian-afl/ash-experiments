@@ -1,5 +1,5 @@
-use crate::descriptor_set::VEDescriptorSet;
-use crate::device::VEDevice;
+use crate::core::descriptor_set::VEDescriptorSet;
+use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 

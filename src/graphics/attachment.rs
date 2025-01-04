@@ -1,4 +1,4 @@
-use crate::image::VEImage;
+use crate::image::image::VEImage;
 use ash::vk;
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ pub struct VEAttachment {
 }
 
 impl VEAttachment {
-    pub fn new(
+    pub fn from_image(
         image: Arc<VEImage>,
         blending: Option<AttachmentBlending>,
         clear: Option<vk::ClearValue>,
@@ -36,9 +36,9 @@ impl VEAttachment {
             .final_layout(if for_present {
                 vk::ImageLayout::PRESENT_SRC_KHR
             } else if image.is_depth() {
-                vk::ImageLayout::GENERAL
+                vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL // TODO verify, its the final layout
             } else {
-                vk::ImageLayout::GENERAL // TODO ???????????
+                vk::ImageLayout::GENERAL
             });
 
         VEAttachment {

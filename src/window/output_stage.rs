@@ -1,17 +1,17 @@
-use crate::attachment::VEAttachment;
-use crate::command_buffer::VECommandBuffer;
-use crate::command_pool::VECommandPool;
-use crate::descriptor_set::VEDescriptorSet;
-use crate::descriptor_set_layout::VEDescriptorSetLayout;
-use crate::device::VEDevice;
-use crate::image::VEImage;
-use crate::main_device_queue::VEMainDeviceQueue;
+use crate::core::command_buffer::VECommandBuffer;
+use crate::core::command_pool::VECommandPool;
+use crate::core::descriptor_set::VEDescriptorSet;
+use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
+use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::semaphore::VESemaphore;
+use crate::core::shader_module::VEShaderModule;
+use crate::graphics::attachment::VEAttachment;
+use crate::graphics::render_stage::{CullMode, VERenderStage};
+use crate::graphics::vertex_attributes::VertexAttribFormat;
+use crate::image::image::VEImage;
 use crate::memory::memory_manager::VEMemoryManager;
-use crate::render_stage::{CullMode, VERenderStage};
-use crate::semaphore::VESemaphore;
-use crate::shader_module::VEShaderModule;
-use crate::swapchain::VESwapchain;
-use crate::vertex_attributes::VertexAttribFormat;
+use crate::window::swapchain::VESwapchain;
 use ash::vk;
 use std::sync::{Arc, Mutex};
 
@@ -50,7 +50,7 @@ impl VEOutputStage {
                 None => (),
                 Some(depth_attachment) => attachments.push(depth_attachment),
             }
-            let image = VEImage::from_swapchain_present_image(
+            let image = Arc::new(VEImage::from_swapchain_present_image(
                 device.clone(),
                 queue.clone(),
                 command_pool.clone(),
@@ -60,8 +60,8 @@ impl VEOutputStage {
                 swapchain_locked.present_image_format,
                 swapchain_locked.present_images[i],
                 swapchain_locked.present_image_views[i],
-            );
-            let color_atta = image.create_attachment(None, clear_color, true);
+            ));
+            let color_atta = VEAttachment::from_image(image, None, clear_color, true);
             attachments.push(&color_atta);
             render_stages.push(VERenderStage::new(
                 device.clone(),

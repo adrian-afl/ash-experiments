@@ -1,7 +1,7 @@
-use crate::device::VEDevice;
-use crate::main_device_queue::VEMainDeviceQueue;
-use crate::semaphore::VESemaphore;
-use crate::window::VEWindow;
+use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::semaphore::VESemaphore;
+use crate::window::window::VEWindow;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{

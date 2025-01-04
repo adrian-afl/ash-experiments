@@ -1,4 +1,4 @@
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
 use crate::memory::memory_chunk::{VEMemoryChunk, VESingleAllocation};
 use ash::vk::{Buffer, Image};
 use std::collections::HashMap;
@@ -8,6 +8,7 @@ pub struct VEMemoryManager {
     device: Arc<VEDevice>,
     chunks: HashMap<u32, Vec<VEMemoryChunk>>,
     identifier_counter: u64,
+    mapped: bool,
 }
 
 impl VEMemoryManager {
@@ -16,6 +17,7 @@ impl VEMemoryManager {
             device,
             chunks: HashMap::new(),
             identifier_counter: 0,
+            mapped: false,
         }
     }
 
@@ -64,9 +66,14 @@ impl VEMemoryManager {
     }
 
     pub fn map(&mut self, allocation: &VESingleAllocation) -> *mut core::ffi::c_void {
+        if self.mapped {
+            // this is to work around the limitation of memory chunks
+            panic!("Cannot map as memory is already mapped somewhere else");
+        }
         for chunks_for_type in self.chunks.values() {
             for chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
+                    self.mapped = true;
                     return chunk.map(allocation.offset, allocation.size);
                 }
             }
@@ -78,6 +85,7 @@ impl VEMemoryManager {
         for chunks_for_type in self.chunks.values() {
             for chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
+                    self.mapped = false;
                     return chunk.unmap();
                 }
             }

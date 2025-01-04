@@ -1,4 +1,4 @@
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
 use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, MemoryMapFlags};
 use std::sync::Arc;
 

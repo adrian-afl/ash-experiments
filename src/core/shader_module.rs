@@ -1,4 +1,4 @@
-use crate::device::VEDevice;
+use crate::core::device::VEDevice;
 use ash::util::read_spv;
 use ash::vk;
 use ash::vk::ShaderModuleCreateInfo;
