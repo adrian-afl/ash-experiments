@@ -1,9 +1,11 @@
 mod buffer;
 mod command_buffer;
 mod command_pool;
+mod descriptor_set_layout;
 mod device;
 mod main_device_queue;
 mod memory;
+mod shader_module;
 mod swapchain;
 mod vertex_buffer;
 mod window;

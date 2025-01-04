@@ -1,17 +1,46 @@
 use crate::device::VEDevice;
+use crate::main_device_queue::VEMainDeviceQueue;
 use crate::window::VEWindow;
 use ash::khr::swapchain;
-use ash::vk;
-use ash::vk::SwapchainKHR;
+use ash::vk::{
+    ComponentMapping, ComponentSwizzle, Extent2D, ImageSubresourceRange, ImageViewCreateInfo,
+    ImageViewType, PresentInfoKHR, PresentModeKHR, Semaphore, SurfaceCapabilitiesKHR,
+    SurfaceFormatKHR, SwapchainKHR,
+};
+use ash::{vk, Device};
 use std::sync::Arc;
+
+struct SwapChainSupportDetails {
+    surface_capabilities: SurfaceCapabilitiesKHR,
+    formats: Vec<SurfaceFormatKHR>,
+    present_modes: Vec<PresentModeKHR>,
+}
+
+impl SwapChainSupportDetails {
+    fn default() -> Self {
+        Self {
+            surface_capabilities: SurfaceCapabilitiesKHR::default(),
+            formats: Vec::new(),
+            present_modes: Vec::new(),
+        }
+    }
+}
 
 pub struct VESwapchain {
     device: Arc<VEDevice>,
-    pub swapchain: SwapchainKHR,
+    swapchain: SwapchainKHR,
+    swapchain_loader: swapchain::Device,
+    present_images: Vec<vk::Image>,
+    present_image_views: Vec<vk::ImageView>,
+    main_device_queue: Arc<VEMainDeviceQueue>,
 }
 
 impl VESwapchain {
-    pub fn new(window: &VEWindow, device: Arc<VEDevice>) -> VESwapchain {
+    pub fn new(
+        window: &VEWindow,
+        device: Arc<VEDevice>,
+        main_device_queue: Arc<VEMainDeviceQueue>,
+    ) -> VESwapchain {
         let surface_format = unsafe {
             device
                 .surface_loader
@@ -79,6 +108,57 @@ impl VESwapchain {
                 .unwrap()
         };
 
-        VESwapchain { device, swapchain }
+        let present_images = unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
+        let present_image_views: Vec<vk::ImageView> = present_images
+            .iter()
+            .map(|&image| {
+                let create_view_info = vk::ImageViewCreateInfo::default()
+                    .view_type(vk::ImageViewType::TYPE_2D)
+                    .format(surface_format.format)
+                    .components(vk::ComponentMapping {
+                        r: vk::ComponentSwizzle::R,
+                        g: vk::ComponentSwizzle::G,
+                        b: vk::ComponentSwizzle::B,
+                        a: vk::ComponentSwizzle::A,
+                    })
+                    .subresource_range(vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    })
+                    .image(image);
+                unsafe {
+                    device
+                        .device
+                        .create_image_view(&create_view_info, None)
+                        .unwrap()
+                }
+            })
+            .collect();
+
+        VESwapchain {
+            device,
+            swapchain,
+            swapchain_loader,
+            present_images,
+            present_image_views,
+            main_device_queue,
+        }
+    }
+
+    pub fn present(&self, wait_semaphores: &Vec<Semaphore>, image_index: u32) {
+        let swapchains = [self.swapchain];
+        let images = [image_index];
+        let info = PresentInfoKHR::default()
+            .wait_semaphores(wait_semaphores)
+            .swapchains(&swapchains)
+            .image_indices(&images);
+        unsafe {
+            self.swapchain_loader
+                .queue_present(self.main_device_queue.main_queue, &info)
+                .unwrap();
+        }
     }
 }
