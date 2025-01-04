@@ -6,13 +6,12 @@ use std::sync::Arc;
 pub struct VERenderPass {
     device: Arc<VEDevice>,
     pub handle: vk::RenderPass,
-    pub attachments: Vec<Arc<VEAttachment>>,
 }
 
 impl VERenderPass {
     pub fn new(
         device: Arc<VEDevice>,
-        attachments: Vec<Arc<VEAttachment>>,
+        attachments: &[&VEAttachment],
         subpasses: &[vk::SubpassDescription],
     ) -> VERenderPass {
         let atta_descs: Vec<vk::AttachmentDescription> =
@@ -29,10 +28,6 @@ impl VERenderPass {
                 .unwrap()
         };
 
-        VERenderPass {
-            device,
-            handle,
-            attachments,
-        }
+        VERenderPass { device, handle }
     }
 }

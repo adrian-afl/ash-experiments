@@ -12,6 +12,8 @@ mod graphics_pipeline;
 mod image;
 mod main_device_queue;
 mod memory;
+mod output_stage;
+mod render_stage;
 mod renderpass;
 mod semaphore;
 mod shader_module;
@@ -32,8 +34,11 @@ use crate::descriptor_set_layout::{
 use crate::device::VEDevice;
 use crate::main_device_queue::VEMainDeviceQueue;
 use crate::memory::memory_manager::VEMemoryManager;
+use crate::output_stage::VEOutputStage;
+use crate::render_stage::CullMode;
 use crate::shader_module::{VEShaderModule, VEShaderModuleType};
 use crate::swapchain::VESwapchain;
+use crate::vertex_attributes::VertexAttribFormat;
 use crate::window::VEWindow;
 use ash::vk;
 use ash::vk::BufferUsageFlags;
@@ -49,14 +54,18 @@ async fn main() {
     {
         let command_pool = Arc::new(VECommandPool::new(device.clone()));
         let main_device_queue = Arc::new(VEMainDeviceQueue::new(device.clone()));
-        let swapchain = VESwapchain::new(&window, device.clone(), main_device_queue.clone());
+        let swapchain = Arc::new(Mutex::from(VESwapchain::new(
+            &window,
+            device.clone(),
+            main_device_queue.clone(),
+        )));
         {
-            let mut mem = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
+            let mut memory_manager = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
             {
                 let mut buffer = VEBuffer::new(
                     device.clone(),
                     VEBufferType::Storage,
-                    mem.clone(),
+                    memory_manager.clone(),
                     1024,
                     vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
                 );
@@ -92,7 +101,7 @@ async fn main() {
                 // let compute_stage2 =
                 //     VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
 
-                let command_buffer = VECommandBuffer::new(device.clone(), command_pool);
+                let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone());
                 compute_stage.begin_recording(&command_buffer);
                 compute_stage.set_descriptor_set(&command_buffer, 0, descriptor_set);
                 compute_stage.dispatch(&command_buffer, 4, 1, 1);
@@ -112,7 +121,43 @@ async fn main() {
                 println!("{:?}", device.device.handle());
                 println!("{readback1}, {readback2}, {readback3}, {readback4}");
 
-                swapchain.present(&[], 0);
+                let vertex_shader = VEShaderModule::new(
+                    device.clone(),
+                    &mut fs::File::open("vertex.spv").unwrap(),
+                    VEShaderModuleType::Compute,
+                );
+
+                let fragment_shader = VEShaderModule::new(
+                    device.clone(),
+                    &mut fs::File::open("fragment.spv").unwrap(),
+                    VEShaderModuleType::Compute,
+                );
+
+                let mut output_stage = VEOutputStage::new(
+                    device.clone(),
+                    main_device_queue.clone(),
+                    command_pool.clone(),
+                    memory_manager.clone(),
+                    swapchain.clone(),
+                    None,
+                    &[],
+                    &vertex_shader,
+                    &fragment_shader,
+                    &[VertexAttribFormat::RGB32f],
+                    vk::PrimitiveTopology::TRIANGLE_LIST,
+                    CullMode::None,
+                );
+
+                output_stage.next_image();
+                output_stage.begin_recording(&command_buffer);
+                output_stage.end_recording(&command_buffer);
+                command_buffer.submit(
+                    &main_device_queue,
+                    &[&output_stage.image_ready_semaphore],
+                    &[&output_stage.ready_for_present_semaphore],
+                );
+
+                output_stage.present();
             }
         }
     }

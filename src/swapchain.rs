@@ -171,4 +171,16 @@ impl VESwapchain {
                 .unwrap();
         }
     }
+
+    pub fn acquire_next_image(&mut self, semaphore: &VESemaphore) -> u32 {
+        let result = unsafe {
+            self.swapchain_loader.acquire_next_image(
+                self.swapchain,
+                2000,
+                semaphore.handle,
+                vk::Fence::null(),
+            )
+        };
+        result.unwrap().0
+    }
 }

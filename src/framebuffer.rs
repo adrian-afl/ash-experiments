@@ -15,7 +15,7 @@ impl VEFrameBuffer {
         width: u32,
         height: u32,
         render_pass: &VERenderPass,
-        attachments: Vec<Arc<VEAttachment>>,
+        attachments: &[&VEAttachment],
     ) -> VEFrameBuffer {
         let image_views: Vec<vk::ImageView> = attachments.iter().map(|a| a.image.view).collect();
 

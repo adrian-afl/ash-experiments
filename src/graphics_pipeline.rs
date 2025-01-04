@@ -1,4 +1,4 @@
-use crate::attachment::AttachmentBlending;
+use crate::attachment::{AttachmentBlending, VEAttachment};
 use crate::descriptor_set_layout::VEDescriptorSetLayout;
 use crate::device::VEDevice;
 use crate::renderpass::VERenderPass;
@@ -22,9 +22,9 @@ impl VEGraphicsPipeline {
         set_layouts: &[&VEDescriptorSetLayout],
         vertex_shader: &VEShaderModule,
         fragment_shader: &VEShaderModule,
-        render_pass: Arc<VERenderPass>,
+        render_pass: VERenderPass,
+        attachments: &[&VEAttachment],
         vertex_attributes: &[VertexAttribFormat],
-        enable_depth: bool,
         primitive_topology: vk::PrimitiveTopology,
         cull_flags: vk::CullModeFlags,
     ) -> VEGraphicsPipeline {
@@ -34,8 +34,8 @@ impl VEGraphicsPipeline {
             .name(c"main");
 
         let fragment_shader_stage_info = vk::PipelineShaderStageCreateInfo::default()
-            .stage(vk::ShaderStageFlags::VERTEX)
-            .module(vertex_shader.handle)
+            .stage(vk::ShaderStageFlags::FRAGMENT)
+            .module(fragment_shader.handle)
             .name(c"main");
 
         let shader_stage_infos = [vertex_shader_stage_info, fragment_shader_stage_info];
@@ -87,22 +87,13 @@ impl VEGraphicsPipeline {
             .sample_shading_enable(false)
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 
-        let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
-            .depth_test_enable(enable_depth)
-            .depth_write_enable(enable_depth)
-            .depth_compare_op(if enable_depth {
-                vk::CompareOp::LESS
-            } else {
-                vk::CompareOp::ALWAYS
-            })
-            .min_depth_bounds(0.0)
-            .max_depth_bounds(1.0);
+        let mut enable_depth = false;
 
         let mut attas: Vec<vk::PipelineColorBlendAttachmentState> = vec![];
 
         //for att in render_pass.attachments {
-        for i in 0..render_pass.attachments.len() {
-            let att = &render_pass.attachments[i];
+        for i in 0..attachments.len() {
+            let att = &attachments[i];
             if !att.image.is_depth() {
                 // not a depth buffer
                 let mut blend_state = vk::PipelineColorBlendAttachmentState::default()
@@ -142,8 +133,22 @@ impl VEGraphicsPipeline {
                     },
                 }
                 attas.push(blend_state);
+            } else {
+                // is a depth buffer, enable depth
+                enable_depth = true;
             }
         }
+
+        let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
+            .depth_test_enable(enable_depth)
+            .depth_write_enable(enable_depth)
+            .depth_compare_op(if enable_depth {
+                vk::CompareOp::LESS
+            } else {
+                vk::CompareOp::ALWAYS
+            })
+            .min_depth_bounds(0.0)
+            .max_depth_bounds(1.0);
 
         let color_blending = vk::PipelineColorBlendStateCreateInfo::default()
             .logic_op_enable(false)
