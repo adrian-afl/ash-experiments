@@ -7,13 +7,17 @@ mod compute_stage;
 mod descriptor_set;
 mod descriptor_set_layout;
 mod device;
+mod framebuffer;
+mod graphics_pipeline;
 mod image;
 mod main_device_queue;
 mod memory;
+mod renderpass;
 mod semaphore;
 mod shader_module;
 mod subpass;
 mod swapchain;
+mod vertex_attributes;
 mod vertex_buffer;
 mod window;
 
@@ -31,6 +35,7 @@ use crate::memory::memory_manager::VEMemoryManager;
 use crate::shader_module::{VEShaderModule, VEShaderModuleType};
 use crate::swapchain::VESwapchain;
 use crate::window::VEWindow;
+use ash::vk;
 use ash::vk::BufferUsageFlags;
 use std::fs;
 use std::sync::{Arc, Mutex};
@@ -48,8 +53,13 @@ async fn main() {
         {
             let mut mem = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
             {
-                let mut buffer =
-                    VEBuffer::new(device.clone(), VEBufferType::Storage, mem.clone(), 1024);
+                let mut buffer = VEBuffer::new(
+                    device.clone(),
+                    VEBufferType::Storage,
+                    mem.clone(),
+                    1024,
+                    vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+                );
                 let mem = buffer.map() as *mut f32;
                 unsafe {
                     mem.offset(0).write(1.0_f32);
@@ -82,7 +92,7 @@ async fn main() {
                 // let compute_stage2 =
                 //     VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
 
-                let command_buffer = VECommandBuffer::new(device.clone(), &command_pool);
+                let command_buffer = VECommandBuffer::new(device.clone(), command_pool);
                 compute_stage.begin_recording(&command_buffer);
                 compute_stage.set_descriptor_set(&command_buffer, 0, descriptor_set);
                 compute_stage.dispatch(&command_buffer, 4, 1, 1);

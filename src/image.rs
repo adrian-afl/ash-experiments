@@ -1,3 +1,4 @@
+use crate::attachment::{AttachmentBlending, VEAttachment};
 use crate::command_buffer::VECommandBuffer;
 use crate::command_pool::VECommandPool;
 use crate::device::VEDevice;
@@ -7,7 +8,6 @@ use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
 use std::sync::{Arc, Mutex};
-use crate::attachment::{AttachmentBlending, VEAttachment};
 
 #[derive(Clone)]
 pub struct VEImage {
@@ -30,7 +30,7 @@ pub struct VEImage {
 
     allocation: VESingleAllocation,
     handle: vk::Image,
-    view: vk::ImageView,
+    pub view: vk::ImageView,
     // mipmap view but thats for later
     sampler: Option<vk::Sampler>, // TODO maybe this can be different, separate for example
     sampler_address_mode: vk::SamplerAddressMode,
@@ -165,15 +165,14 @@ impl VEImage {
         device: Arc<VEDevice>,
         queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
-        memory_manager: Arc<Mutex<VEMemoryManager>>
+        memory_manager: Arc<Mutex<VEMemoryManager>>,
 
         width: u32,
         height: u32,
 
         format: vk::Format,
         image_handle: vk::Image,
-        image_view_handle: vk::ImageView
-
+        image_view_handle: vk::ImageView,
     ) -> VEImage {
         let mut image = VEImage {
             device,
@@ -185,7 +184,7 @@ impl VEImage {
                 alloc_identifier: u64::MAX,
                 chunk_identifier: u64::MAX,
                 size: 0,
-                offset: 0
+                offset: 0,
             },
 
             width,
@@ -213,13 +212,24 @@ impl VEImage {
         image
     }
 
-    pub fn create_attachment(&self, blending: Option<AttachmentBlending>, clear: bool, clear_color: vk::ClearColorValue, for_present: bool) -> VEAttachment {
-        VEAttachment::new(Arc::new(self.clone()), blending, clear, clear_color, for_present)
+    pub fn create_attachment(
+        &self,
+        blending: Option<AttachmentBlending>,
+        clear: bool,
+        clear_color: vk::ClearColorValue,
+        for_present: bool,
+    ) -> VEAttachment {
+        VEAttachment::new(
+            Arc::new(self.clone()),
+            blending,
+            clear,
+            clear_color,
+            for_present,
+        )
     }
-    
+
     pub fn is_depth(&self) -> bool {
-        self.format == vk::Format::D16_UNORM 
-        || self.format == vk::Format::D32_SFLOAT
+        self.format == vk::Format::D16_UNORM || self.format == vk::Format::D32_SFLOAT
     }
 
     fn transition_layout(&mut self, new_layout: vk::ImageLayout) {
