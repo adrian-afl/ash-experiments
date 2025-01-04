@@ -148,6 +148,8 @@ pub fn create_vertex_input_state_descriptions(
         .map(|a| get_vertex_attribute_type_byte_size(a))
         .sum();
 
+    println!("stride: {stride}");
+
     if (stride % 4 != 0) {
         panic!("Stride not dividable by 4");
     }
@@ -168,6 +170,10 @@ pub fn create_vertex_input_state_descriptions(
                 .location(location)
                 .format(resolve_vertex_attribute_format(attrib))
                 .offset(offset);
+            println!(
+                "location: {location} offset {offset} format {:?}",
+                resolve_vertex_attribute_format(attrib)
+            );
             descriptions.push(desc);
             location += 1;
         }

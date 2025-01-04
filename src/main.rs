@@ -10,6 +10,7 @@ mod device;
 mod framebuffer;
 mod graphics_pipeline;
 mod image;
+mod load_vertex_buffer_from_file;
 mod main_device_queue;
 mod memory;
 mod output_stage;
@@ -32,6 +33,7 @@ use crate::descriptor_set_layout::{
     VEDescriptorSetLayoutField,
 };
 use crate::device::VEDevice;
+use crate::load_vertex_buffer_from_file::load_vertex_buffer_from_file;
 use crate::main_device_queue::VEMainDeviceQueue;
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::output_stage::VEOutputStage;
@@ -39,6 +41,7 @@ use crate::render_stage::CullMode;
 use crate::shader_module::{VEShaderModule, VEShaderModuleType};
 use crate::swapchain::VESwapchain;
 use crate::vertex_attributes::VertexAttribFormat;
+use crate::vertex_buffer::VEVertexBuffer;
 use crate::window::VEWindow;
 use ash::vk;
 use ash::vk::BufferUsageFlags;
@@ -150,13 +153,28 @@ async fn main() {
                     &[],
                     &vertex_shader,
                     &fragment_shader,
-                    &[VertexAttribFormat::RGB32f, VertexAttribFormat::RG32f],
+                    &[
+                        VertexAttribFormat::RGB32f,
+                        VertexAttribFormat::RGB32f,
+                        VertexAttribFormat::RG32f,
+                        VertexAttribFormat::RGBA32f,
+                    ],
                     vk::PrimitiveTopology::TRIANGLE_LIST,
                     CullMode::None,
                 );
 
+                let vertex_buffer = load_vertex_buffer_from_file(
+                    device.clone(),
+                    memory_manager.clone(),
+                    "dingus.raw",
+                    3 * 4 + 3 * 4 + 2 * 4 + 4 * 4,
+                );
+
                 output_stage.next_image();
                 output_stage.begin_recording(&command_buffer);
+
+                vertex_buffer.draw_instanced(&command_buffer, 1);
+
                 output_stage.end_recording(&command_buffer);
                 command_buffer.submit(
                     &main_device_queue,
