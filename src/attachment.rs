@@ -11,22 +11,20 @@ pub struct VEAttachment {
     pub image: Arc<VEImage>,
     pub description: vk::AttachmentDescription,
     pub blending: Option<AttachmentBlending>,
-    pub clear: bool,
-    pub clear_color: vk::ClearColorValue,
+    pub clear: Option<vk::ClearValue>,
 }
 
 impl VEAttachment {
     pub fn new(
         image: Arc<VEImage>,
         blending: Option<AttachmentBlending>,
-        clear: bool,
-        clear_color: vk::ClearColorValue,
+        clear: Option<vk::ClearValue>,
         for_present: bool,
     ) -> VEAttachment {
         let description = vk::AttachmentDescription::default()
             .format(image.format)
             .samples(vk::SampleCountFlags::TYPE_1)
-            .load_op(if clear {
+            .load_op(if clear.is_some() {
                 vk::AttachmentLoadOp::CLEAR
             } else {
                 vk::AttachmentLoadOp::LOAD
@@ -47,7 +45,6 @@ impl VEAttachment {
             image,
             description,
             blending,
-            clear_color,
             clear,
         }
     }

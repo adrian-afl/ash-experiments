@@ -44,6 +44,8 @@ use ash::vk;
 use ash::vk::BufferUsageFlags;
 use std::fs;
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::Duration;
 use tokio::main;
 
 #[main]
@@ -139,11 +141,16 @@ async fn main() {
                     command_pool.clone(),
                     memory_manager.clone(),
                     swapchain.clone(),
+                    Some(vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 1.0, 1.0],
+                        },
+                    }),
                     None,
                     &[],
                     &vertex_shader,
                     &fragment_shader,
-                    &[VertexAttribFormat::RGB32f],
+                    &[VertexAttribFormat::RGB32f, VertexAttribFormat::RG32f],
                     vk::PrimitiveTopology::TRIANGLE_LIST,
                     CullMode::None,
                 );
@@ -158,6 +165,8 @@ async fn main() {
                 );
 
                 output_stage.present();
+
+                sleep(Duration::from_secs(2));
             }
         }
     }

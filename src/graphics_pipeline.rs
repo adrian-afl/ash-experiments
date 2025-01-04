@@ -22,7 +22,7 @@ impl VEGraphicsPipeline {
         set_layouts: &[&VEDescriptorSetLayout],
         vertex_shader: &VEShaderModule,
         fragment_shader: &VEShaderModule,
-        render_pass: VERenderPass,
+        render_pass: &VERenderPass,
         attachments: &[&VEAttachment],
         vertex_attributes: &[VertexAttribFormat],
         primitive_topology: vk::PrimitiveTopology,

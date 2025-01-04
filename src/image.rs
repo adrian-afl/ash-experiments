@@ -199,7 +199,7 @@ impl VEImage {
 
             handle: image_handle,
             view: image_view_handle,
-            current_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+            current_layout: vk::ImageLayout::UNDEFINED,
 
             sampler: None,
             sampler_address_mode: vk::SamplerAddressMode::REPEAT,
@@ -207,7 +207,7 @@ impl VEImage {
             min_filter: vk::Filter::LINEAR,
             mag_filter: vk::Filter::LINEAR,
         };
-        image.transition_layout(vk::ImageLayout::GENERAL);
+        // image.transition_layout(vk::ImageLayout::GENERAL);
 
         image
     }
@@ -215,17 +215,10 @@ impl VEImage {
     pub fn create_attachment(
         &self,
         blending: Option<AttachmentBlending>,
-        clear: bool,
-        clear_color: vk::ClearColorValue,
+        clear: Option<vk::ClearValue>,
         for_present: bool,
     ) -> VEAttachment {
-        VEAttachment::new(
-            Arc::new(self.clone()),
-            blending,
-            clear,
-            clear_color,
-            for_present,
-        )
+        VEAttachment::new(Arc::new(self.clone()), blending, clear, for_present)
     }
 
     pub fn is_depth(&self) -> bool {
@@ -312,7 +305,8 @@ impl VEImage {
         }
 
         let command_buffer = VECommandBuffer::new(self.device.clone(), self.command_pool.clone());
-        command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        command_buffer.begin(CommandBufferUsageFlags::empty());
 
         self.image_memory_barrier(
             &command_buffer,

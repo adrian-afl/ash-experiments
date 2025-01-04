@@ -23,7 +23,8 @@ impl VEFrameBuffer {
             .attachments(&image_views)
             .render_pass(render_pass.handle)
             .width(width)
-            .height(height);
+            .height(height)
+            .layers(1);
 
         let handle = unsafe {
             device

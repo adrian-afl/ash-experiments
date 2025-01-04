@@ -33,6 +33,7 @@ impl VEOutputStage {
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         swapchain: Arc<Mutex<VESwapchain>>,
+        clear_color: Option<vk::ClearValue>,
         depth_attachment: Option<&VEAttachment>,
         set_layouts: &[&VEDescriptorSetLayout],
         vertex_shader: &VEShaderModule,
@@ -60,14 +61,7 @@ impl VEOutputStage {
                 swapchain_locked.present_images[i],
                 swapchain_locked.present_image_views[i],
             );
-            let color_atta = image.create_attachment(
-                None,
-                true,
-                vk::ClearColorValue {
-                    float32: [1.0, 0.0, 1.0, 1.0],
-                },
-                true,
-            );
+            let color_atta = image.create_attachment(None, clear_color, true);
             attachments.push(&color_atta);
             render_stages.push(VERenderStage::new(
                 device.clone(),
@@ -99,10 +93,12 @@ impl VEOutputStage {
             .lock()
             .unwrap()
             .acquire_next_image(&self.image_ready_semaphore);
+        println!("Aquired image {}", self.current_image);
     }
 
     pub fn present(&mut self) {
         let waitfor = [&self.ready_for_present_semaphore];
+        println!("Presenting image {}", self.current_image);
         self.swapchain
             .lock()
             .unwrap()

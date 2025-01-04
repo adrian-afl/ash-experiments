@@ -179,6 +179,7 @@ impl VEDevice {
         ];
         let features = vk::PhysicalDeviceFeatures {
             shader_clip_distance: 1,
+            depth_clamp: 1,
             ..Default::default()
         };
         let priorities = [1.0];
