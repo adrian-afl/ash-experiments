@@ -1,6 +1,7 @@
 use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use std::sync::Arc;
 pub fn transition_image_layout(
     device: Arc<VEDevice>,
     command_pool: Arc<VECommandPool>,
+    queue: Arc<VEMainDeviceQueue>,
     image_handle: vk::Image,
     aspect: vk::ImageAspectFlags,
     current_layout: vk::ImageLayout,
@@ -99,6 +101,9 @@ pub fn transition_image_layout(
     );
 
     command_buffer.end();
+
+    command_buffer.submit(&queue, &[], &[]);
+    queue.wait_idle();
 }
 
 fn image_memory_barrier(

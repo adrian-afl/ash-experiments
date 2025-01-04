@@ -49,6 +49,7 @@ impl VEImage {
         transition_image_layout(
             self.device.clone(),
             self.command_pool.clone(),
+            self.queue.clone(),
             self.handle,
             self.aspect,
             from_layout,

@@ -29,6 +29,7 @@ impl VEImage {
 
         memory_properties: vk::MemoryPropertyFlags,
     ) -> VEImage {
+        println!("format is {:?}", format);
         let mut empty = VEImage::from_full(
             device.clone(),
             queue.clone(),
@@ -39,13 +40,13 @@ impl VEImage {
             depth,
             format,
             tiling,
-            usage,
+            usage | vk::ImageUsageFlags::TRANSFER_DST,
             memory_properties,
         );
 
         let mut staging_buffer = VEBuffer::new(
             device.clone(),
-            VEBufferType::Vertex,
+            VEBufferType::TransferSource,
             memory_manager.clone(),
             data.len() as vk::DeviceSize,
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
@@ -89,6 +90,9 @@ impl VEImage {
         }
 
         command_buffer.end();
+
+        command_buffer.submit(&queue, &[], &[]);
+        queue.wait_idle();
 
         empty.transition_layout(
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,

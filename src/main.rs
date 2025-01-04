@@ -65,48 +65,51 @@ async fn main() {
                 }
                 buffer.unmap();
 
-                let mut descriptor_set_layout = VEDescriptorSetLayout::new(
-                    device.clone(),
-                    &[VEDescriptorSetLayoutField {
-                        binding: 0,
-                        typ: VEDescriptorSetFieldType::StorageBuffer,
-                        stage: VEDescriptorSetFieldStage::Compute,
-                    }],
-                );
-
-                let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
-                descriptor_set.bind_buffer(0, &buffer);
-
-                let compute_shader = VEShaderModule::new(
-                    device.clone(),
-                    &mut fs::File::open("compute.spv").unwrap(),
-                    VEShaderModuleType::Compute,
-                );
-
-                let mut compute_stage =
-                    VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
-                // let compute_stage2 =
-                //     VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
-
                 let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone());
-                compute_stage.begin_recording(&command_buffer);
-                compute_stage.set_descriptor_set(&command_buffer, 0, descriptor_set);
-                compute_stage.dispatch(&command_buffer, 4, 1, 1);
-                compute_stage.end_recording(&command_buffer);
 
-                command_buffer.submit(&main_device_queue, &[], &[]);
-
-                main_device_queue.wait_idle();
-
-                let mem = buffer.map() as *mut f32;
-                let readback1 = unsafe { mem.offset(0).read() };
-                let readback2 = unsafe { mem.offset(1).read() };
-                let readback3 = unsafe { mem.offset(2).read() };
-                let readback4 = unsafe { mem.offset(3).read() };
-                buffer.unmap();
-
-                println!("{:?}", device.device.handle());
-                println!("{readback1}, {readback2}, {readback3}, {readback4}");
+                //
+                // let mut descriptor_set_layout = VEDescriptorSetLayout::new(
+                //     device.clone(),
+                //     &[VEDescriptorSetLayoutField {
+                //         binding: 0,
+                //         typ: VEDescriptorSetFieldType::StorageBuffer,
+                //         stage: VEDescriptorSetFieldStage::Compute,
+                //     }],
+                // );
+                //
+                // let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
+                // descriptor_set.bind_buffer(0, &buffer);
+                //
+                // let compute_shader = VEShaderModule::new(
+                //     device.clone(),
+                //     &mut fs::File::open("compute.spv").unwrap(),
+                //     VEShaderModuleType::Compute,
+                // );
+                //
+                // let mut compute_stage =
+                //     VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
+                // // let compute_stage2 =
+                // //     VEComputeStage::new(device.clone(), &[&descriptor_set_layout], &compute_shader);
+                //
+                //
+                // compute_stage.begin_recording(&command_buffer);
+                // compute_stage.set_descriptor_set(&command_buffer, 0, descriptor_set);
+                // compute_stage.dispatch(&command_buffer, 4, 1, 1);
+                // compute_stage.end_recording(&command_buffer);
+                //
+                // command_buffer.submit(&main_device_queue, &[], &[]);
+                //
+                // main_device_queue.wait_idle();
+                //
+                // let mem = buffer.map() as *mut f32;
+                // let readback1 = unsafe { mem.offset(0).read() };
+                // let readback2 = unsafe { mem.offset(1).read() };
+                // let readback3 = unsafe { mem.offset(2).read() };
+                // let readback4 = unsafe { mem.offset(3).read() };
+                // buffer.unmap();
+                //
+                // println!("{:?}", device.device.handle());
+                // println!("{readback1}, {readback2}, {readback3}, {readback4}");
 
                 let vertex_shader = VEShaderModule::new(
                     device.clone(),
@@ -130,7 +133,7 @@ async fn main() {
                 );
 
                 let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
-                descriptor_set.bind_buffer(0, &buffer);
+                // descriptor_set.bind_buffer(0, &buffer);
 
                 let mut output_stage = VEOutputStage::new(
                     device.clone(),
@@ -169,7 +172,7 @@ async fn main() {
                     main_device_queue.clone(),
                     command_pool.clone(),
                     memory_manager.clone(),
-                    "dingus.jpg",
+                    "test-normal-map.jpg",
                     vk::ImageUsageFlags::SAMPLED,
                 );
 
