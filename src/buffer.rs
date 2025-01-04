@@ -1,25 +1,44 @@
 use crate::device::VEDevice;
 use crate::memory::memory_chunk::VESingleAllocation;
 use crate::memory::memory_manager::VEMemoryManager;
+use ash::vk;
 use ash::vk::{
     Buffer, BufferCreateInfo, BufferUsageFlags, DeviceSize, MemoryPropertyFlags, SharingMode,
 };
 use std::sync::{Arc, Mutex};
+
+#[derive(Debug)]
+pub enum VEBufferType {
+    Uniform,
+    Storage,
+    TransferSource,
+    TransferDestination,
+    Vertex,
+}
 
 pub struct VEBuffer {
     device: Arc<VEDevice>,
     memory_manager: Arc<Mutex<VEMemoryManager>>,
     allocation: VESingleAllocation,
     pub buffer: Buffer,
+    pub size: u64,
+    pub typ: VEBufferType,
 }
 
 impl VEBuffer {
     pub fn new(
         device: Arc<VEDevice>,
+        typ: VEBufferType,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         size: DeviceSize,
-        usage: BufferUsageFlags,
     ) -> VEBuffer {
+        let usage = match typ {
+            VEBufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
+            VEBufferType::Storage => vk::BufferUsageFlags::STORAGE_BUFFER,
+            VEBufferType::TransferSource => vk::BufferUsageFlags::TRANSFER_SRC,
+            VEBufferType::TransferDestination => vk::BufferUsageFlags::TRANSFER_DST,
+            VEBufferType::Vertex => vk::BufferUsageFlags::VERTEX_BUFFER,
+        };
         unsafe {
             let buffer = device
                 .device
@@ -38,7 +57,6 @@ impl VEBuffer {
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             );
 
-            // allocate the memory, in a sub-scope so borrow is dropped
             let allocation = {
                 memory_manager
                     .lock()
@@ -46,12 +64,13 @@ impl VEBuffer {
                     .bind_buffer_memory(mem_index, buffer, size)
             };
 
-            // return the VEBuffer
             VEBuffer {
                 device,
-                memory_manager, // Problem here: cannot borrow `*memory_manager` as mutable more than once at a time
+                memory_manager,
                 buffer,
                 allocation,
+                size,
+                typ,
             }
         }
     }

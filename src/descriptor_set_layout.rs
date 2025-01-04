@@ -1,8 +1,9 @@
+use crate::descriptor_set::VEDescriptorSet;
 use crate::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 
-enum DescriptorSetFieldStage {
+pub enum VEDescriptorSetFieldStage {
     All,
     AllGraphics,
     Compute,
@@ -10,58 +11,86 @@ enum DescriptorSetFieldStage {
     Fragment,
 }
 
-enum DescriptorSetFieldType {
+pub enum VEDescriptorSetFieldType {
     Sampler,
     UniformBuffer,
     StorageBuffer,
     StorageImage,
 }
 
-pub struct DescriptorSetLayout<'a> {
+pub struct VEDescriptorSetLayout {
     device: Arc<VEDevice>,
     allocation_counter: u32,
-    layout: vk::DescriptorSetLayout,
-    bindings: Vec<Arc<vk::DescriptorSetLayoutBinding<'a>>>,
+    pub layout: vk::DescriptorSetLayout,
     pools: Vec<Arc<vk::DescriptorPool>>,
 }
 
-pub struct DescriptorSetLayoutField {
-    binding: u32,
-    typ: DescriptorSetFieldType,
-    stage: DescriptorSetFieldStage,
+pub struct VEDescriptorSetLayoutField {
+    pub binding: u32,
+    pub typ: VEDescriptorSetFieldType,
+    pub stage: VEDescriptorSetFieldStage,
 }
 
-static DEFAULT_POOL_SIZE: u32 = 1000;
+static DEFAULT_POOL_SIZE: u32 = 256;
 
-impl<'a> DescriptorSetLayout<'a> {
+impl VEDescriptorSetLayout {
     pub fn new(
         device: Arc<VEDevice>,
-        fields: Vec<DescriptorSetLayoutField>,
-    ) -> DescriptorSetLayout {
+        fields: &[VEDescriptorSetLayoutField],
+    ) -> VEDescriptorSetLayout {
         let mut bindings = vec![];
         for field in fields {
             let typ = match field.typ {
-                DescriptorSetFieldType::Sampler => vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                DescriptorSetFieldType::UniformBuffer => vk::DescriptorType::UNIFORM_BUFFER,
-                DescriptorSetFieldType::StorageBuffer => vk::DescriptorType::STORAGE_BUFFER,
-                DescriptorSetFieldType::StorageImage => vk::DescriptorType::STORAGE_IMAGE,
+                VEDescriptorSetFieldType::Sampler => vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                VEDescriptorSetFieldType::UniformBuffer => vk::DescriptorType::UNIFORM_BUFFER,
+                VEDescriptorSetFieldType::StorageBuffer => vk::DescriptorType::STORAGE_BUFFER,
+                VEDescriptorSetFieldType::StorageImage => vk::DescriptorType::STORAGE_IMAGE,
             };
             let stage = match field.stage {
-                DescriptorSetFieldStage::All => vk::ShaderStageFlags::ALL,
-                DescriptorSetFieldStage::AllGraphics => vk::ShaderStageFlags::ALL_GRAPHICS,
-                DescriptorSetFieldStage::Compute => vk::ShaderStageFlags::COMPUTE,
-                DescriptorSetFieldStage::Vertex => vk::ShaderStageFlags::VERTEX,
-                DescriptorSetFieldStage::Fragment => vk::ShaderStageFlags::FRAGMENT,
+                VEDescriptorSetFieldStage::All => vk::ShaderStageFlags::ALL,
+                VEDescriptorSetFieldStage::AllGraphics => vk::ShaderStageFlags::ALL_GRAPHICS,
+                VEDescriptorSetFieldStage::Compute => vk::ShaderStageFlags::COMPUTE,
+                VEDescriptorSetFieldStage::Vertex => vk::ShaderStageFlags::VERTEX,
+                VEDescriptorSetFieldStage::Fragment => vk::ShaderStageFlags::FRAGMENT,
             };
             bindings.push(
                 vk::DescriptorSetLayoutBinding::default()
                     .binding(field.binding)
+                    .descriptor_count(1)
                     .descriptor_type(typ)
                     .stage_flags(stage),
             )
         }
 
-        DescriptorSetLayout {}
+        let info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
+
+        let layout = unsafe {
+            device
+                .device
+                .create_descriptor_set_layout(&info, None)
+                .unwrap()
+        };
+
+        VEDescriptorSetLayout {
+            device,
+            layout,
+            pools: vec![],
+            allocation_counter: 0,
+        }
+    }
+
+    pub fn create_descriptor_set(&mut self) -> VEDescriptorSet {
+        if (self.pools.len() == 0) {
+            self.generate_new_set_pool();
+        } else {
+            self.allocation_counter += 1;
+            if (self.allocation_counter >= DEFAULT_POOL_SIZE) {
+                self.generate_new_set_pool();
+                self.allocation_counter = 0;
+            }
+        }
+        let pool = self.pools.last().unwrap();
+        VEDescriptorSet::new(self.device.clone(), self.layout, pool)
     }
 
     pub fn generate_new_set_pool(&mut self) {
@@ -81,7 +110,7 @@ impl<'a> DescriptorSetLayout<'a> {
         ];
         let info = vk::DescriptorPoolCreateInfo::default()
             .pool_sizes(&pool_sizes)
-            .max_sets(1000);
+            .max_sets(DEFAULT_POOL_SIZE); // TODO weird
         let pool = unsafe {
             self.device
                 .device
@@ -89,5 +118,15 @@ impl<'a> DescriptorSetLayout<'a> {
                 .unwrap()
         };
         self.pools.push(Arc::new(pool));
+    }
+}
+
+impl Drop for VEDescriptorSetLayout {
+    fn drop(&mut self) {
+        unsafe {
+            self.device
+                .device
+                .destroy_descriptor_set_layout(self.layout, None)
+        }
     }
 }

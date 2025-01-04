@@ -2,12 +2,11 @@ use crate::device::VEDevice;
 use crate::main_device_queue::VEMainDeviceQueue;
 use crate::window::VEWindow;
 use ash::khr::swapchain;
+use ash::vk;
 use ash::vk::{
-    ComponentMapping, ComponentSwizzle, Extent2D, ImageSubresourceRange, ImageViewCreateInfo,
-    ImageViewType, PresentInfoKHR, PresentModeKHR, Semaphore, SurfaceCapabilitiesKHR,
-    SurfaceFormatKHR, SwapchainKHR,
+    PresentInfoKHR, PresentModeKHR, Semaphore, SurfaceCapabilitiesKHR, SurfaceFormatKHR,
+    SwapchainKHR,
 };
-use ash::{vk, Device};
 use std::sync::Arc;
 
 struct SwapChainSupportDetails {
