@@ -31,6 +31,7 @@ impl VEBuffer {
         typ: VEBufferType,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         size: DeviceSize,
+        memory_properties: MemoryPropertyFlags,
     ) -> VEBuffer {
         let usage = match typ {
             VEBufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
@@ -52,16 +53,13 @@ impl VEBuffer {
                 .unwrap();
 
             let mem_reqs = device.device.get_buffer_memory_requirements(buffer);
-            let mem_index = device.find_memory_type(
-                mem_reqs.memory_type_bits,
-                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            );
+            let mem_index = device.find_memory_type(mem_reqs.memory_type_bits, memory_properties);
 
             let allocation = {
                 memory_manager
                     .lock()
                     .unwrap()
-                    .bind_buffer_memory(mem_index, buffer, size)
+                    .bind_buffer_memory(mem_index, buffer, mem_reqs.size)
             };
 
             VEBuffer {

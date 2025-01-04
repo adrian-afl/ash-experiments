@@ -1,3 +1,4 @@
+mod attachment;
 mod buffer;
 mod command_buffer;
 mod command_pool;
@@ -6,10 +7,12 @@ mod compute_stage;
 mod descriptor_set;
 mod descriptor_set_layout;
 mod device;
+mod image;
 mod main_device_queue;
 mod memory;
 mod semaphore;
 mod shader_module;
+mod subpass;
 mod swapchain;
 mod vertex_buffer;
 mod window;
@@ -98,6 +101,8 @@ async fn main() {
 
                 println!("{:?}", device.device.handle());
                 println!("{readback1}, {readback2}, {readback3}, {readback4}");
+
+                swapchain.present(&[], 0);
             }
         }
     }

@@ -1,11 +1,11 @@
 use crate::device::VEDevice;
 use crate::main_device_queue::VEMainDeviceQueue;
+use crate::semaphore::VESemaphore;
 use crate::window::VEWindow;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{
-    PresentInfoKHR, PresentModeKHR, Semaphore, SurfaceCapabilitiesKHR, SurfaceFormatKHR,
-    SwapchainKHR,
+    PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR,
 };
 use std::sync::Arc;
 
@@ -29,9 +29,13 @@ pub struct VESwapchain {
     device: Arc<VEDevice>,
     swapchain: SwapchainKHR,
     swapchain_loader: swapchain::Device,
-    present_images: Vec<vk::Image>,
-    present_image_views: Vec<vk::ImageView>,
     main_device_queue: Arc<VEMainDeviceQueue>,
+
+    pub present_images: Vec<vk::Image>,
+    pub present_image_views: Vec<vk::ImageView>,
+    pub present_image_format: vk::Format,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl VESwapchain {
@@ -144,14 +148,21 @@ impl VESwapchain {
             present_images,
             present_image_views,
             main_device_queue,
+
+            width: surface_resolution.width,
+            height: surface_resolution.height,
+            present_image_format: surface_format.format,
         }
     }
 
-    pub fn present(&self, wait_semaphores: &Vec<Semaphore>, image_index: u32) {
+    pub fn present(&self, wait_for_semaphores: &[&VESemaphore], image_index: u32) {
+        let wait_handles: Vec<vk::Semaphore> =
+            wait_for_semaphores.iter().map(|x| x.handle).collect();
+
         let swapchains = [self.swapchain];
         let images = [image_index];
         let info = PresentInfoKHR::default()
-            .wait_semaphores(wait_semaphores)
+            .wait_semaphores(&wait_handles)
             .swapchains(&swapchains)
             .image_indices(&images);
         unsafe {

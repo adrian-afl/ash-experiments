@@ -11,13 +11,15 @@ use std::sync::Arc;
 
 pub struct VECommandBuffer {
     device: Arc<VEDevice>,
+    command_pool: Arc<VECommandPool>,
     pub handle: CommandBuffer,
 }
 
 impl<'a> VECommandBuffer {
-    pub fn new(device: Arc<VEDevice>, command_pool: &VECommandPool) -> VECommandBuffer {
+    pub fn new(device: Arc<VEDevice>, command_pool: Arc<VECommandPool>) -> VECommandBuffer {
         VECommandBuffer {
             device: device.clone(),
+            command_pool: command_pool.clone(),
             handle: unsafe {
                 device
                     .device
@@ -85,5 +87,15 @@ impl<'a> VECommandBuffer {
                 .queue_submit(queue.main_queue, &[submit_info], vk::Fence::null())
                 .unwrap();
         }
+    }
+}
+
+impl Drop for VECommandBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            self.device
+                .device
+                .free_command_buffers(self.command_pool.handle, &[self.handle])
+        };
     }
 }
