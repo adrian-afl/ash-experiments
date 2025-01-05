@@ -63,14 +63,17 @@ impl VEDevice {
             .map(|raw_name| raw_name.as_ptr())
             .collect();
 
+        let winit_window = window.window.as_ref().unwrap();
+
         let mut extension_names = ash_window::enumerate_required_extensions(
-            window.window.display_handle().unwrap().as_raw(),
+            winit_window.display_handle().unwrap().as_raw(),
         )
         .unwrap()
         .to_vec();
         extension_names.push(debug_utils::NAME.as_ptr());
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
+            println!("good");
             extension_names.push(ash::khr::portability_enumeration::NAME.as_ptr());
             // Enabling this extension is a requirement when using `VK_KHR_portability_subset`
             extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
@@ -84,8 +87,10 @@ impl VEDevice {
             .api_version(make_api_version(0, 1, 3, 0));
 
         let create_flags = if cfg!(any(target_os = "macos", target_os = "ios")) {
+            println!("good");
             InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
         } else {
+            println!("bad");
             InstanceCreateFlags::default()
         };
 
@@ -131,8 +136,8 @@ impl VEDevice {
             ash_window::create_surface(
                 &window.entry,
                 &instance,
-                window.window.display_handle().unwrap().as_raw(),
-                window.window.window_handle().unwrap().as_raw(),
+                winit_window.display_handle().unwrap().as_raw(),
+                winit_window.window_handle().unwrap().as_raw(),
                 None,
             )
             .unwrap()

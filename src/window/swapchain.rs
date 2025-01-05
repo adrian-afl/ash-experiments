@@ -44,6 +44,7 @@ impl VESwapchain {
         device: Arc<VEDevice>,
         main_device_queue: Arc<VEMainDeviceQueue>,
     ) -> VESwapchain {
+        let winit_window = window.window.as_ref().unwrap();
         let surface_format = unsafe {
             device
                 .surface_loader
@@ -65,8 +66,8 @@ impl VESwapchain {
         }
         let surface_resolution = match surface_capabilities.current_extent.width {
             u32::MAX => vk::Extent2D {
-                width: window.window.inner_size().width,
-                height: window.window.inner_size().height,
+                width: winit_window.inner_size().width,
+                height: winit_window.inner_size().height,
             },
             _ => surface_capabilities.current_extent,
         };
