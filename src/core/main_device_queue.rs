@@ -2,6 +2,7 @@ use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct VEMainDeviceQueue {
     device: Arc<VEDevice>,
     pub main_queue: vk::Queue,

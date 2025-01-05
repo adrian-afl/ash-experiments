@@ -4,6 +4,7 @@ use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::semaphore::VESemaphore;
 use crate::image::image::VEImage;
+use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::window::VEWindow;
 use ash::khr::swapchain;
 use ash::vk;
@@ -11,7 +12,9 @@ use ash::vk::{
     CommandBufferUsageFlags, PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR,
     SurfaceFormatKHR, SwapchainKHR,
 };
-use std::sync::Arc;
+use std::fmt::{Debug, Formatter};
+use std::sync::{Arc, Mutex};
+use tracing::instrument;
 
 struct SwapChainSupportDetails {
     surface_capabilities: SurfaceCapabilitiesKHR,
@@ -35,9 +38,7 @@ pub struct VESwapchain {
     swapchain_loader: swapchain::Device,
     main_device_queue: Arc<VEMainDeviceQueue>,
 
-    pub present_images: Vec<vk::Image>,
-    pub present_image_views: Vec<vk::ImageView>,
-    pub present_image_format: vk::Format,
+    pub present_images: Vec<VEImage>,
     pub width: u32,
     pub height: u32,
 
@@ -46,12 +47,20 @@ pub struct VESwapchain {
     present_command_buffer: VECommandBuffer,
 }
 
+impl Debug for VESwapchain {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VESwapchain")
+    }
+}
+
 impl VESwapchain {
+    #[instrument]
     pub fn new(
         window: &VEWindow,
         device: Arc<VEDevice>,
         main_device_queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
+        memory_manager: Arc<Mutex<VEMemoryManager>>,
     ) -> VESwapchain {
         let winit_window = window.window.as_ref().unwrap();
         let surface_format = unsafe {
@@ -107,7 +116,7 @@ impl VESwapchain {
             .image_color_space(surface_format.color_space)
             .image_format(surface_format.format)
             .image_extent(surface_resolution)
-            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+            .image_usage(vk::ImageUsageFlags::TRANSFER_DST)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(pre_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
@@ -121,8 +130,9 @@ impl VESwapchain {
                 .unwrap()
         };
 
-        let present_images = unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
-        let present_image_views: Vec<vk::ImageView> = present_images
+        let present_images_raw =
+            unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
+        let present_image_views_raw: Vec<vk::ImageView> = present_images_raw
             .iter()
             .map(|&image| {
                 let create_view_info = vk::ImageViewCreateInfo::default()
@@ -151,17 +161,30 @@ impl VESwapchain {
             })
             .collect();
 
+        let mut present_images = vec![];
+        for i in 0..present_images_raw.len() {
+            present_images.push(VEImage::from_swapchain_present_image(
+                device.clone(),
+                main_device_queue.clone(),
+                command_pool.clone(),
+                memory_manager.clone(),
+                surface_resolution.width,
+                surface_resolution.height,
+                surface_format.format,
+                present_images_raw[i],
+                present_image_views_raw[i],
+            ))
+        }
+
         VESwapchain {
             device: device.clone(),
             swapchain,
             swapchain_loader,
             present_images,
-            present_image_views,
             main_device_queue,
 
             width: surface_resolution.width,
             height: surface_resolution.height,
-            present_image_format: surface_format.format,
 
             acquire_ready_semaphore: VESemaphore::new(device.clone()),
             blit_done_semaphore: VESemaphore::new(device.clone()),
@@ -169,6 +192,7 @@ impl VESwapchain {
         }
     }
 
+    #[instrument]
     pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: &[&VESemaphore]) {
         let acquired = self.acquire_next_image(self.acquire_ready_semaphore.handle);
 
@@ -176,6 +200,9 @@ impl VESwapchain {
         let blit_semaphore = &self.blit_done_semaphore;
         let mut wait_handles: Vec<&VESemaphore> = Vec::from(wait_for_semaphores);
         wait_handles.push(ack_semaphore);
+
+        self.present_images[acquired as usize]
+            .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL);
 
         self.present_command_buffer
             .begin(CommandBufferUsageFlags::SIMULTANEOUS_USE); // TODO try to remove this flag
@@ -191,7 +218,8 @@ impl VESwapchain {
                 vk::Offset3D::default(),
                 vk::Offset3D::default()
                     .x(source.width as i32)
-                    .y(source.height as i32),
+                    .y(source.height as i32)
+                    .z(1),
             ])
             .dst_subresource(
                 vk::ImageSubresourceLayers::default()
@@ -203,7 +231,8 @@ impl VESwapchain {
                 vk::Offset3D::default(),
                 vk::Offset3D::default()
                     .x(self.width as i32)
-                    .y(self.height as i32),
+                    .y(self.height as i32)
+                    .z(1),
             ]);
 
         unsafe {
@@ -211,8 +240,8 @@ impl VESwapchain {
                 self.present_command_buffer.handle,
                 source.handle,
                 source.current_layout,
-                self.present_images[acquired as usize],
-                vk::ImageLayout::PRESENT_SRC_KHR,
+                self.present_images[acquired as usize].handle,
+                vk::ImageLayout::GENERAL,
                 &[region],
                 vk::Filter::LINEAR,
             )
@@ -225,9 +254,13 @@ impl VESwapchain {
             &[blit_semaphore],
         );
 
+        self.present_images[acquired as usize]
+            .transition_layout(vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR);
+
         self.present(&[], acquired);
     }
 
+    #[instrument]
     fn present(&self, wait_handles: &[vk::Semaphore], image_index: u32) {
         let swapchains = [self.swapchain];
         let images = [image_index];
@@ -242,6 +275,7 @@ impl VESwapchain {
         }
     }
 
+    #[instrument]
     fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> u32 {
         let result = unsafe {
             self.swapchain_loader.acquire_next_image(

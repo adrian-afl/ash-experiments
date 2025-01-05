@@ -11,10 +11,13 @@ use crate::graphics::render_stage::{CullMode, VERenderStage};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
 use crate::graphics::vertex_buffer::VEVertexBuffer;
 use crate::image::image::VEImage;
+use crate::image::sampler::VESampler;
 use ash::vk;
 use std::sync::Arc;
 
 pub struct MyApp {
+    texture: VEImage,
+    sampler: VESampler,
     vertex_buffer: VEVertexBuffer,
     descriptor_set: Arc<VEDescriptorSet>,
     command_buffer: VECommandBuffer,
@@ -44,15 +47,19 @@ impl MyApp {
         let width = 640;
         let height = 480;
 
-        let color_buffer = Arc::new(toolkit.make_image_full(
+        let mut color_buffer = toolkit.make_image_full(
             width,
             height,
             1,
             vk::Format::R32G32B32A32_SFLOAT,
             vk::ImageTiling::OPTIMAL,
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::empty(),
-        ));
+        );
+
+        color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
+
+        let color_buffer = Arc::new(color_buffer);
 
         let color_attachment = VEAttachment::from_image(
             color_buffer.clone(),
@@ -121,12 +128,14 @@ impl MyApp {
         descriptor_set.bind_image_sampler(0, &texture, &sampler);
 
         MyApp {
-            result_image: color_buffer.clone(),
+            result_image: color_buffer,
             render_done_semaphore: toolkit.make_semaphore(),
             render_stage,
             vertex_buffer,
             command_buffer,
             descriptor_set,
+            texture,
+            sampler,
         }
     }
 }
@@ -150,7 +159,11 @@ impl App for MyApp {
             &[&self.render_done_semaphore],
         );
 
-        swapchain.blit(&self.result_image, &[&self.render_done_semaphore])
+        toolkit.queue.wait_idle();
+
+        swapchain.blit(&self.result_image, &[&self.render_done_semaphore]);
+
+        toolkit.queue.wait_idle();
         // winit_window.pre_present_notify();
     }
 }

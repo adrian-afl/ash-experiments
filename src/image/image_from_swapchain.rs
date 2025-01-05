@@ -41,14 +41,13 @@ impl VEImage {
             format,
             tiling: vk::ImageTiling::OPTIMAL,
 
-            usage: vk::ImageUsageFlags::empty(),
-            aspect: vk::ImageAspectFlags::empty(),
+            usage: vk::ImageUsageFlags::TRANSFER_DST,
+            aspect: vk::ImageAspectFlags::COLOR,
 
             handle: image_handle,
             view: image_view_handle,
             current_layout: vk::ImageLayout::UNDEFINED,
         };
-        // image.transition_layout(vk::ImageLayout::GENERAL);
 
         image
     }

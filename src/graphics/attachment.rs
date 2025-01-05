@@ -36,7 +36,7 @@ impl VEAttachment {
             .final_layout(if for_present {
                 vk::ImageLayout::PRESENT_SRC_KHR
             } else if image.is_depth() {
-                vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL // TODO verify, its the final layout
+                vk::ImageLayout::PREINITIALIZED // TODO verify, its the final layout
             } else {
                 vk::ImageLayout::GENERAL
             });

@@ -1,5 +1,7 @@
 use crate::core::toolkit::VEToolkit;
+use crate::window::swapchain::VESwapchain;
 use ash::Entry;
+use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
@@ -19,6 +21,12 @@ pub struct VEWindow {
     initial_window_attributes: WindowAttributes,
 
     pub app: Arc<Mutex<dyn AppCallback>>,
+}
+
+impl Debug for VEWindow {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VEWindow")
+    }
 }
 
 impl ApplicationHandler for VEWindow {
@@ -42,7 +50,6 @@ impl ApplicationHandler for VEWindow {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                println!("Draw");
                 window.pre_present_notify();
                 self.app.lock().unwrap().on_window_draw();
                 window.request_redraw();

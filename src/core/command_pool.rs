@@ -2,6 +2,7 @@ use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct VECommandPool {
     device: Arc<VEDevice>,
     pub handle: vk::CommandPool,

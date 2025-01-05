@@ -17,7 +17,7 @@ mod image_from_full;
 #[path = "./image_from_swapchain.rs"]
 mod image_from_swapchain;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VEImage {
     device: Arc<VEDevice>,
     queue: Arc<VEMainDeviceQueue>,
