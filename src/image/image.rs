@@ -6,6 +6,7 @@ use crate::memory::memory_chunk::VESingleAllocation;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use std::sync::{Arc, Mutex};
+use tracing::instrument;
 
 #[path = "./image_from_data.rs"]
 mod image_from_data;

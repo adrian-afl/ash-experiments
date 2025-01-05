@@ -6,3 +6,4 @@ pub mod device;
 pub mod main_device_queue;
 pub mod semaphore;
 pub mod shader_module;
+pub mod toolkit;

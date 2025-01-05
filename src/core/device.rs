@@ -11,6 +11,7 @@ use ash::{vk, Device, Instance};
 use std::any::Any;
 use std::borrow::Cow;
 use std::ffi;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::os::raw::c_char;
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -23,6 +24,12 @@ pub struct VEDevice {
     pub surface: SurfaceKHR,
     pub queue_family_index: u32,
     device_memory_properties: PhysicalDeviceMemoryProperties,
+}
+
+impl Debug for VEDevice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VEDevice")
+    }
 }
 
 unsafe extern "system" fn vulkan_debug_callback(

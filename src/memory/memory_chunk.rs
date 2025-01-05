@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VESingleAllocation {
     pub alloc_identifier: u64,
     pub chunk_identifier: u64,
@@ -12,6 +12,7 @@ pub struct VESingleAllocation {
     pub offset: u64,
 }
 
+#[derive(Debug)]
 pub struct VEMemoryChunk {
     pub chunk_identifier: u64,
     device: Arc<VEDevice>,

@@ -3,7 +3,9 @@ use crate::memory::memory_chunk::{VEMemoryChunk, VESingleAllocation};
 use ash::vk::{Buffer, Image};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::instrument;
 
+#[derive(Debug)]
 pub struct VEMemoryManager {
     device: Arc<VEDevice>,
     chunks: HashMap<u32, Vec<VEMemoryChunk>>,
@@ -12,6 +14,7 @@ pub struct VEMemoryManager {
 }
 
 impl VEMemoryManager {
+    #[instrument]
     pub fn new(device: Arc<VEDevice>) -> VEMemoryManager {
         VEMemoryManager {
             device,
@@ -21,6 +24,7 @@ impl VEMemoryManager {
         }
     }
 
+    #[instrument]
     pub fn bind_buffer_memory(
         &mut self,
         memory_type_index: u32,
@@ -31,6 +35,7 @@ impl VEMemoryManager {
         free.0.bind_buffer_memory(buffer, size, free.1)
     }
 
+    #[instrument]
     pub fn bind_image_memory(
         &mut self,
         memory_type_index: u32,
@@ -41,6 +46,7 @@ impl VEMemoryManager {
         free.0.bind_image_memory(image, size, free.1)
     }
 
+    #[instrument]
     fn find_free(&mut self, memory_type_index: u32, size: u64) -> (&mut VEMemoryChunk, u64) {
         if (!self.chunks.contains_key(&memory_type_index)) {
             self.chunks.insert(memory_type_index, vec![]);
@@ -65,6 +71,7 @@ impl VEMemoryManager {
         (chunks_for_type.last_mut().unwrap(), 0)
     }
 
+    #[instrument]
     pub fn map(&mut self, allocation: &VESingleAllocation) -> *mut core::ffi::c_void {
         if self.mapped {
             // this is to work around the limitation of memory chunks
@@ -81,6 +88,7 @@ impl VEMemoryManager {
         panic!("No allocation found")
     }
 
+    #[instrument]
     pub fn unmap(&mut self, allocation: &VESingleAllocation) {
         for chunks_for_type in self.chunks.values() {
             for chunk in chunks_for_type {
@@ -93,6 +101,7 @@ impl VEMemoryManager {
         panic!("No allocation found")
     }
 
+    #[instrument]
     pub fn free_allocation(&mut self, allocation: &VESingleAllocation) {
         for chunks_for_type in self.chunks.values_mut() {
             for i in 0..chunks_for_type.len() {
