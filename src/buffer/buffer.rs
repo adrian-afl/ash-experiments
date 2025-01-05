@@ -26,8 +26,8 @@ pub struct VEBuffer {
 impl VEBuffer {
     pub fn new(
         device: Arc<VEDevice>,
-        typ: VEBufferType,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
+        typ: VEBufferType,
         size: DeviceSize,
         memory_properties: MemoryPropertyFlags,
     ) -> VEBuffer {

@@ -1,11 +1,15 @@
+use crate::core::command_buffer::VECommandBuffer;
+use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::semaphore::VESemaphore;
+use crate::image::image::VEImage;
 use crate::window::window::VEWindow;
 use ash::khr::swapchain;
 use ash::vk;
 use ash::vk::{
-    PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR,
+    CommandBufferUsageFlags, PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR,
+    SurfaceFormatKHR, SwapchainKHR,
 };
 use std::sync::Arc;
 
@@ -36,6 +40,10 @@ pub struct VESwapchain {
     pub present_image_format: vk::Format,
     pub width: u32,
     pub height: u32,
+
+    acquire_ready_semaphore: VESemaphore,
+    pub blit_done_semaphore: VESemaphore,
+    present_command_buffer: VECommandBuffer,
 }
 
 impl VESwapchain {
@@ -43,6 +51,7 @@ impl VESwapchain {
         window: &VEWindow,
         device: Arc<VEDevice>,
         main_device_queue: Arc<VEMainDeviceQueue>,
+        command_pool: Arc<VECommandPool>,
     ) -> VESwapchain {
         let winit_window = window.window.as_ref().unwrap();
         let surface_format = unsafe {
@@ -143,7 +152,7 @@ impl VESwapchain {
             .collect();
 
         VESwapchain {
-            device,
+            device: device.clone(),
             swapchain,
             swapchain_loader,
             present_images,
@@ -153,13 +162,73 @@ impl VESwapchain {
             width: surface_resolution.width,
             height: surface_resolution.height,
             present_image_format: surface_format.format,
+
+            acquire_ready_semaphore: VESemaphore::new(device.clone()),
+            blit_done_semaphore: VESemaphore::new(device.clone()),
+            present_command_buffer: VECommandBuffer::new(device.clone(), command_pool),
         }
     }
 
-    pub fn present(&self, wait_for_semaphores: &[&VESemaphore], image_index: u32) {
-        let wait_handles: Vec<vk::Semaphore> =
-            wait_for_semaphores.iter().map(|x| x.handle).collect();
+    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: &[&VESemaphore]) {
+        let acquired = self.acquire_next_image(self.acquire_ready_semaphore.handle);
 
+        let ack_semaphore = &self.acquire_ready_semaphore;
+        let blit_semaphore = &self.blit_done_semaphore;
+        let mut wait_handles: Vec<&VESemaphore> = Vec::from(wait_for_semaphores);
+        wait_handles.push(ack_semaphore);
+
+        self.present_command_buffer
+            .begin(CommandBufferUsageFlags::SIMULTANEOUS_USE); // TODO try to remove this flag
+
+        let region = vk::ImageBlit::default()
+            .src_subresource(
+                vk::ImageSubresourceLayers::default()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .base_array_layer(0)
+                    .layer_count(1),
+            )
+            .src_offsets([
+                vk::Offset3D::default(),
+                vk::Offset3D::default()
+                    .x(source.width as i32)
+                    .y(source.height as i32),
+            ])
+            .dst_subresource(
+                vk::ImageSubresourceLayers::default()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .base_array_layer(0)
+                    .layer_count(1),
+            )
+            .dst_offsets([
+                vk::Offset3D::default(),
+                vk::Offset3D::default()
+                    .x(self.width as i32)
+                    .y(self.height as i32),
+            ]);
+
+        unsafe {
+            self.device.device.cmd_blit_image(
+                self.present_command_buffer.handle,
+                source.handle,
+                source.current_layout,
+                self.present_images[acquired as usize],
+                vk::ImageLayout::PRESENT_SRC_KHR,
+                &[region],
+                vk::Filter::LINEAR,
+            )
+        }
+
+        self.present_command_buffer.end();
+        self.present_command_buffer.submit(
+            &self.main_device_queue,
+            &wait_handles,
+            &[blit_semaphore],
+        );
+
+        self.present(&[], acquired);
+    }
+
+    fn present(&self, wait_handles: &[vk::Semaphore], image_index: u32) {
         let swapchains = [self.swapchain];
         let images = [image_index];
         let info = PresentInfoKHR::default()
@@ -173,12 +242,12 @@ impl VESwapchain {
         }
     }
 
-    pub fn acquire_next_image(&mut self, semaphore: &VESemaphore) -> u32 {
+    fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> u32 {
         let result = unsafe {
             self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 2000,
-                semaphore.handle,
+                semaphore,
                 vk::Fence::null(),
             )
         };

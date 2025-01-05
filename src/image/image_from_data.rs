@@ -46,8 +46,8 @@ impl VEImage {
 
         let mut staging_buffer = VEBuffer::new(
             device.clone(),
-            VEBufferType::TransferSource,
             memory_manager.clone(),
+            VEBufferType::TransferSource,
             data.len() as vk::DeviceSize,
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );

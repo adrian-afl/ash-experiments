@@ -48,7 +48,7 @@ pub enum VertexAttribFormat {
     Padding32,
 }
 
-fn get_vertex_attribute_type_byte_size(attrib: &VertexAttribFormat) -> u32 {
+pub(crate) fn get_vertex_attribute_type_byte_size(attrib: &VertexAttribFormat) -> u32 {
     match attrib {
         VertexAttribFormat::R8inorm => 1,
         VertexAttribFormat::RG8inorm => 2,

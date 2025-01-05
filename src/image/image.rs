@@ -37,7 +37,7 @@ pub struct VEImage {
     pub current_layout: vk::ImageLayout,
 
     allocation: VESingleAllocation,
-    handle: vk::Image,
+    pub handle: vk::Image,
     pub view: vk::ImageView,
 }
 

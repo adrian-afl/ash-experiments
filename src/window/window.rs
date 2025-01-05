@@ -8,7 +8,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 
 pub trait AppCallback {
-    fn on_window_ready(&mut self);
+    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>);
     fn on_window_draw(&self);
 }
 
@@ -73,6 +73,7 @@ impl VEWindow {
     }
 
     fn on_window_ready(&self) {
-        self.app.lock().unwrap().on_window_ready();
+        let toolkit = Arc::from(VEToolkit::new(self));
+        self.app.lock().unwrap().on_window_ready(toolkit);
     }
 }

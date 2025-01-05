@@ -1,6 +1,7 @@
 use crate::buffer::buffer::{VEBuffer, VEBufferType};
 use crate::core::command_buffer::VECommandBuffer;
 use crate::core::device::VEDevice;
+use crate::graphics::vertex_attributes::{get_vertex_attribute_type_byte_size, VertexAttribFormat};
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use std::fs::File;
@@ -40,11 +41,16 @@ impl VEVertexBuffer {
         device: Arc<VEDevice>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,
-        vertex_size_bytes: usize,
+        vertex_attributes: &[VertexAttribFormat],
     ) -> VEVertexBuffer {
+        let vertex_size_bytes: u32 = vertex_attributes
+            .iter()
+            .map(|a| get_vertex_attribute_type_byte_size(a))
+            .sum();
+
         let mut file = File::open(path).unwrap();
         let metadata = file.metadata().unwrap();
-        let file_size = metadata.len() as usize;
+        let file_size = metadata.len() as u32;
 
         if file_size % vertex_size_bytes != 0 {
             panic!("Mismatch of vertex size in the file, not aligned")
@@ -54,15 +60,15 @@ impl VEVertexBuffer {
 
         let mut buffer = VEBuffer::new(
             device.clone(),
-            VEBufferType::Vertex,
             memory_manager.clone(),
+            VEBufferType::Vertex,
             file_size as vk::DeviceSize,
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );
 
         unsafe {
             let mem = buffer.map() as *mut u8;
-            let mut slice = std::slice::from_raw_parts_mut(mem, file_size);
+            let mut slice = std::slice::from_raw_parts_mut(mem, file_size as usize);
             file.read_exact(&mut slice).unwrap();
             buffer.unmap();
         }

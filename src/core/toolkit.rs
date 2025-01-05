@@ -1,15 +1,23 @@
+use crate::buffer::buffer::{VEBuffer, VEBufferType};
+use crate::compute::compute_stage::VEComputeStage;
 use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::descriptor_set_layout::{VEDescriptorSetLayout, VEDescriptorSetLayoutField};
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::{VEShaderModule, VEShaderModuleType};
+use crate::graphics::attachment::VEAttachment;
+use crate::graphics::render_stage::{CullMode, VERenderStage};
+use crate::graphics::vertex_attributes::VertexAttribFormat;
+use crate::graphics::vertex_buffer::VEVertexBuffer;
 use crate::image::image::VEImage;
+use crate::image::sampler::VESampler;
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::VESwapchain;
 use crate::window::window::{AppCallback, VEWindow};
 use ash::vk;
-use ash::vk::ShaderModule;
+use ash::vk::{DeviceSize, MemoryPropertyFlags, ShaderModule};
 use std::sync::{Arc, Mutex};
 use std::{fs, io};
 use winit::window::WindowAttributes;
@@ -19,10 +27,9 @@ pub trait App {
 }
 
 pub struct VEToolkit {
-    window: Arc<VEWindow>,
     device: Arc<VEDevice>,
-    swapchain: Arc<Mutex<VESwapchain>>,
-    queue: Arc<VEMainDeviceQueue>,
+    pub swapchain: Arc<Mutex<VESwapchain>>,
+    pub queue: Arc<VEMainDeviceQueue>, // TODO maybe this could be made private
     command_pool: Arc<VECommandPool>,
     memory_manager: Arc<Mutex<VEMemoryManager>>,
 }
@@ -35,8 +42,7 @@ pub struct VEToolkitCallbacks {
 }
 
 impl AppCallback for VEToolkitCallbacks {
-    fn on_window_ready(&mut self) {
-        let toolkit = Arc::from(VEToolkit::new(self.window.as_ref().unwrap().clone()));
+    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>) {
         self.toolkit = Some(toolkit.clone());
         let constructor = &self.create_app;
         let app = constructor(toolkit.clone());
@@ -70,7 +76,7 @@ impl VEToolkit {
         ))); //oh god i hope this won't race condition with event loop
     }
 
-    pub fn new(window: Arc<VEWindow>) -> VEToolkit {
+    pub fn new(window: &VEWindow) -> VEToolkit {
         let device = Arc::new(VEDevice::new(&window));
 
         let command_pool = Arc::new(VECommandPool::new(device.clone()));
@@ -79,12 +85,12 @@ impl VEToolkit {
             &window,
             device.clone(),
             queue.clone(),
+            command_pool.clone(),
         )));
 
         let mut memory_manager = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
 
         VEToolkit {
-            window,
             device,
             swapchain,
             queue,
@@ -175,6 +181,94 @@ impl VEToolkit {
             self.memory_manager.clone(),
             path,
             usage,
+        )
+    }
+
+    pub fn make_sampler(
+        &self,
+        sampler_address_mode: vk::SamplerAddressMode,
+
+        min_filter: vk::Filter,
+        mag_filter: vk::Filter,
+
+        anisotropy: bool,
+    ) -> VESampler {
+        VESampler::new(
+            self.device.clone(),
+            sampler_address_mode,
+            min_filter,
+            mag_filter,
+            anisotropy,
+        )
+    }
+
+    pub fn make_semaphore(&self) -> VESemaphore {
+        VESemaphore::new(self.device.clone())
+    }
+
+    pub fn make_buffer(
+        &self,
+        typ: VEBufferType,
+        size: DeviceSize,
+        memory_properties: MemoryPropertyFlags,
+    ) -> VEBuffer {
+        VEBuffer::new(
+            self.device.clone(),
+            self.memory_manager.clone(),
+            typ,
+            size,
+            memory_properties,
+        )
+    }
+
+    pub fn make_vertex_buffer(&self, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
+        VEVertexBuffer::new(self.device.clone(), buffer, vertex_count)
+    }
+
+    pub fn make_vertex_buffer_from_file(
+        &self,
+        path: &str,
+        vertex_attributes: &[VertexAttribFormat],
+    ) -> VEVertexBuffer {
+        VEVertexBuffer::from_file(
+            self.device.clone(),
+            self.memory_manager.clone(),
+            path,
+            vertex_attributes,
+        )
+    }
+
+    pub fn make_compute_stage(
+        &self,
+        set_layouts: &[&VEDescriptorSetLayout],
+        shader: &VEShaderModule,
+    ) -> VEComputeStage {
+        VEComputeStage::new(self.device.clone(), set_layouts, shader)
+    }
+
+    pub fn make_render_stage(
+        &self,
+        viewport_width: u32,
+        viewport_height: u32,
+        attachments: &[&VEAttachment],
+        set_layouts: &[&VEDescriptorSetLayout],
+        vertex_shader: &VEShaderModule,
+        fragment_shader: &VEShaderModule,
+        vertex_attributes: &[VertexAttribFormat],
+        primitive_topology: vk::PrimitiveTopology,
+        cull_mode: CullMode,
+    ) -> VERenderStage {
+        VERenderStage::new(
+            self.device.clone(),
+            viewport_width,
+            viewport_height,
+            attachments,
+            set_layouts,
+            vertex_shader,
+            fragment_shader,
+            vertex_attributes,
+            primitive_topology,
+            cull_mode,
         )
     }
 }
