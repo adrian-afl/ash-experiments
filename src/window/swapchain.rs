@@ -2,7 +2,7 @@ use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::core::semaphore::VESemaphore;
+use crate::core::semaphore::{SemaphoreState, VESemaphore};
 use crate::image::image::VEImage;
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::window::VEWindow;
@@ -14,7 +14,7 @@ use ash::vk::{
 };
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
-use tracing::instrument;
+use tracing::{event, instrument, Level};
 
 struct SwapChainSupportDetails {
     surface_capabilities: SurfaceCapabilitiesKHR,
@@ -132,34 +132,6 @@ impl VESwapchain {
 
         let present_images_raw =
             unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
-        let present_image_views_raw: Vec<vk::ImageView> = present_images_raw
-            .iter()
-            .map(|&image| {
-                let create_view_info = vk::ImageViewCreateInfo::default()
-                    .view_type(vk::ImageViewType::TYPE_2D)
-                    .format(surface_format.format)
-                    .components(vk::ComponentMapping {
-                        r: vk::ComponentSwizzle::R,
-                        g: vk::ComponentSwizzle::G,
-                        b: vk::ComponentSwizzle::B,
-                        a: vk::ComponentSwizzle::A,
-                    })
-                    .subresource_range(vk::ImageSubresourceRange {
-                        aspect_mask: vk::ImageAspectFlags::COLOR,
-                        base_mip_level: 0,
-                        level_count: 1,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    })
-                    .image(image);
-                unsafe {
-                    device
-                        .device
-                        .create_image_view(&create_view_info, None)
-                        .unwrap()
-                }
-            })
-            .collect();
 
         let mut present_images = vec![];
         for i in 0..present_images_raw.len() {
@@ -172,7 +144,6 @@ impl VESwapchain {
                 surface_resolution.height,
                 surface_format.format,
                 present_images_raw[i],
-                present_image_views_raw[i],
             ))
         }
 
@@ -193,12 +164,18 @@ impl VESwapchain {
     }
 
     #[instrument]
-    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: &[&VESemaphore]) {
+    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: &mut [&mut VESemaphore]) {
+        self.acquire_ready_semaphore.state = SemaphoreState::Pending;
+        event!(Level::TRACE, "Setting semaphore acquire_ready_semaphore to Pending");
         let acquired = self.acquire_next_image(self.acquire_ready_semaphore.handle);
 
-        let ack_semaphore = &self.acquire_ready_semaphore;
-        let blit_semaphore = &self.blit_done_semaphore;
-        let mut wait_handles: Vec<&VESemaphore> = Vec::from(wait_for_semaphores);
+        let ack_semaphore = &mut self.acquire_ready_semaphore;
+        let blit_semaphore = &mut self.blit_done_semaphore;
+        let mut wait_handles: Vec<&mut VESemaphore> = vec![];
+        for item in wait_for_semaphores.iter_mut(){
+            wait_handles.push(item);
+        }
+
         wait_handles.push(ack_semaphore);
 
         self.present_images[acquired as usize]
@@ -239,7 +216,7 @@ impl VESwapchain {
             self.device.device.cmd_blit_image(
                 self.present_command_buffer.handle,
                 source.handle,
-                source.current_layout,
+                vk::ImageLayout::GENERAL,
                 self.present_images[acquired as usize].handle,
                 vk::ImageLayout::GENERAL,
                 &[region],
@@ -250,8 +227,8 @@ impl VESwapchain {
         self.present_command_buffer.end();
         self.present_command_buffer.submit(
             &self.main_device_queue,
-            &wait_handles,
-            &[blit_semaphore],
+            wait_handles.as_mut_slice(),
+            &mut [blit_semaphore],
         );
 
         self.present_images[acquired as usize]
@@ -275,7 +252,7 @@ impl VESwapchain {
         }
     }
 
-    #[instrument(level = "trace")]
+    #[instrument]
     fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> u32 {
         let result = unsafe {
             self.swapchain_loader.acquire_next_image(

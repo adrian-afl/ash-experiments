@@ -14,6 +14,7 @@ use std::ffi;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::os::raw::c_char;
+use tracing::{event, trace, Level};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 pub struct VEDevice {
@@ -53,8 +54,8 @@ unsafe extern "system" fn vulkan_debug_callback(
         ffi::CStr::from_ptr(callback_data.p_message).to_string_lossy()
     };
 
-    println!(
-        "{message_severity:?}:\n{message_type:?} [{message_id_name} ({message_id_number})] : {message}\n",
+    event!(Level::WARN,
+        "VALIDATION {message_severity:?}: {message_type:?} [{message_id_name} ({message_id_number})] : {message}",
     );
 
     vk::FALSE

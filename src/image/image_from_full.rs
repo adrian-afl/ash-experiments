@@ -116,10 +116,10 @@ impl VEImage {
             aspect,
 
             handle: image_handle,
-            view: image_view_handle,
+            view: Some(image_view_handle),
             current_layout: vk::ImageLayout::PREINITIALIZED,
         };
-        // image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL);
+        image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL);
 
         image
     }

@@ -26,7 +26,7 @@ impl VEDescriptorSet {
 
     pub fn bind_image_sampler(&self, binding: u32, image: &VEImage, sampler: &VESampler) {
         let infos = [vk::DescriptorImageInfo::default()
-            .image_view(image.view)
+            .image_view(image.view.unwrap())
             .sampler(sampler.handle)
             .image_layout(image.current_layout)];
         self.write(
@@ -39,7 +39,7 @@ impl VEDescriptorSet {
 
     pub fn bind_image_storage(&self, binding: u32, image: &VEImage) {
         let infos = [vk::DescriptorImageInfo::default()
-            .image_view(image.view)
+            .image_view(image.view.unwrap())
             .image_layout(image.current_layout)];
         self.write(
             vk::WriteDescriptorSet::default()

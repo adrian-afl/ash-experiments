@@ -39,7 +39,7 @@ pub struct VEImage {
 
     allocation: VESingleAllocation,
     pub handle: vk::Image,
-    pub view: vk::ImageView,
+    pub view: Option<vk::ImageView>,
 }
 
 impl Debug for VEImage {

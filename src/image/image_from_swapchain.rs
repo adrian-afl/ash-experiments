@@ -19,7 +19,6 @@ impl VEImage {
 
         format: vk::Format,
         image_handle: vk::Image,
-        image_view_handle: vk::ImageView,
     ) -> VEImage {
         let mut image = VEImage {
             device,
@@ -45,9 +44,11 @@ impl VEImage {
             aspect: vk::ImageAspectFlags::COLOR,
 
             handle: image_handle,
-            view: image_view_handle,
+            view: None,
             current_layout: vk::ImageLayout::UNDEFINED,
         };
+
+        image.transition_layout(image.current_layout, vk::ImageLayout::PRESENT_SRC_KHR);
 
         image
     }

@@ -21,6 +21,7 @@ use winit::window::WindowAttributes;
 #[main]
 async fn main() {
     let subscriber = FmtSubscriber::builder()
+        .with_ansi(false)
         .with_writer(File::create("log.txt").unwrap())
         .with_span_events(FmtSpan::FULL)
         .with_max_level(Level::TRACE)

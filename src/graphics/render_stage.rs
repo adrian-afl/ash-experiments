@@ -7,11 +7,8 @@ use crate::graphics::attachment::VEAttachment;
 use crate::graphics::framebuffer::VEFrameBuffer;
 use crate::graphics::graphics_pipeline::VEGraphicsPipeline;
 use crate::graphics::renderpass::VERenderPass;
-use crate::graphics::subpass::{create_subpass, create_subpass_attachment_reference};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
-use crate::graphics::vertex_buffer::VEVertexBuffer;
 use ash::vk;
-use ash::vk::{ClearColorValue, CommandBufferUsageFlags, RenderPass};
 use std::sync::Arc;
 
 static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::GRAPHICS;
@@ -52,25 +49,7 @@ impl VERenderStage {
             CullMode::Back => vk::CullModeFlags::BACK,
         };
 
-        let color_attas: Vec<&&VEAttachment> =
-            attachments.iter().filter(|x| !x.is_depth).collect();
-        let depth_atta = attachments.iter().filter(|x| x.is_depth).last();
-
-        let color_references: Vec<vk::AttachmentReference> = (0..color_attas.len())
-            .map(|i| create_subpass_attachment_reference(i as i32, false))
-            .collect();
-
-        let depth_reference_maybe =
-            create_subpass_attachment_reference(color_attas.len() as i32, true);
-        let depth_reference = match depth_atta {
-            None => None,
-            Some(_) => Some(&depth_reference_maybe), // depth last
-        };
-
-        let subpass = create_subpass(&color_references, depth_reference);
-        let subpasses = [subpass];
-
-        let render_pass = VERenderPass::new(device.clone(), attachments, &subpasses);
+        let render_pass = VERenderPass::new(device.clone(), attachments);
 
         let framebuffer = VEFrameBuffer::new(
             // for what is this used? is this needed?? TODO
@@ -133,7 +112,7 @@ impl VERenderStage {
     }
 
     pub fn begin_recording(&self, command_buffer: &VECommandBuffer) {
-        command_buffer.begin(CommandBufferUsageFlags::empty());
+        command_buffer.begin(vk::CommandBufferUsageFlags::empty());
 
         let rect = vk::Rect2D::default()
             .offset(vk::Offset2D::default())

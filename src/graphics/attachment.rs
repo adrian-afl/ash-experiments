@@ -37,13 +37,13 @@ impl VEAttachment {
             .final_layout(if for_present {
                 vk::ImageLayout::PRESENT_SRC_KHR
             } else if image.is_depth() {
-                vk::ImageLayout::PREINITIALIZED // TODO verify, its the final layout
+                vk::ImageLayout::GENERAL // TODO verify, its the final layout
             } else {
                 vk::ImageLayout::GENERAL
             });
 
         VEAttachment {
-            image_view: image.view,
+            image_view: image.view.unwrap(),
             is_depth: image.is_depth(),
             description,
             blending,

@@ -14,6 +14,7 @@ use crate::image::image::VEImage;
 use crate::image::sampler::VESampler;
 use ash::vk;
 use std::sync::Arc;
+use tracing::{event, Level};
 
 pub struct MyApp {
     texture: VEImage,
@@ -57,7 +58,7 @@ impl MyApp {
             vk::MemoryPropertyFlags::empty(),
         );
 
-        color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
+        // color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
 
         let color_attachment = VEAttachment::from_image(
             &color_buffer,
@@ -151,12 +152,14 @@ impl App for MyApp {
 
         let mut swapchain = toolkit.swapchain.lock().unwrap();
 
+        event!(Level::TRACE, "App submit");
         self.command_buffer.submit(
             &toolkit.queue,
-            &[&swapchain.blit_done_semaphore],
-            &[&self.render_done_semaphore],
+            &mut [&mut swapchain.blit_done_semaphore],
+            &mut [&mut self.render_done_semaphore],
         );
 
-        swapchain.blit(&self.result_image, &[&self.render_done_semaphore]);
+        event!(Level::TRACE, "App blit");
+        swapchain.blit(&self.result_image, &mut [&mut self.render_done_semaphore]);
     }
 }

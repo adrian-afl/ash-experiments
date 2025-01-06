@@ -1,6 +1,9 @@
+use std::fmt::{Debug, Formatter, Write};
 use crate::core::device::VEDevice;
 use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, MemoryMapFlags};
 use std::sync::Arc;
+use tracing::instrument;
+use crate::image::image::VEImage;
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -12,7 +15,6 @@ pub struct VESingleAllocation {
     pub offset: u64,
 }
 
-#[derive(Debug)]
 pub struct VEMemoryChunk {
     pub chunk_identifier: u64,
     device: Arc<VEDevice>,
@@ -21,7 +23,14 @@ pub struct VEMemoryChunk {
     identifier_counter: u64,
 }
 
+impl Debug for VEMemoryChunk {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("VEMemoryChunk({})", self.chunk_identifier))
+    }
+}
+
 impl VEMemoryChunk {
+    #[instrument]
     pub fn new(
         device: Arc<VEDevice>,
         chunk_identifier: u64,
@@ -47,6 +56,7 @@ impl VEMemoryChunk {
         }
     }
 
+    #[instrument]
     pub fn free_allocation(&mut self, alloc_identifier: u64) {
         for i in 0..self.allocations.len() {
             if self.allocations[i].alloc_identifier == alloc_identifier {
@@ -56,6 +66,7 @@ impl VEMemoryChunk {
         }
     }
 
+    #[instrument]
     pub fn bind_buffer_memory(
         &mut self,
         buffer: Buffer,
@@ -80,6 +91,7 @@ impl VEMemoryChunk {
         self.allocations.last().unwrap().clone()
     }
 
+    #[instrument]
     pub fn bind_image_memory(
         &mut self,
         image: Image,
@@ -104,6 +116,7 @@ impl VEMemoryChunk {
         self.allocations.last().unwrap().clone()
     }
 
+    #[instrument]
     pub fn find_free_memory_offset(&self, size: u64) -> Option<u64> {
         if self.is_free_space(0, size) {
             return Some(0);
@@ -116,6 +129,7 @@ impl VEMemoryChunk {
         None
     }
 
+    #[instrument]
     fn is_free_space(&self, offset: u64, size: u64) -> bool {
         let end = offset + size;
         if (end >= CHUNK_SIZE) {
@@ -143,6 +157,7 @@ impl VEMemoryChunk {
         true
     }
 
+    #[instrument]
     pub fn map(&self, offset: u64, size: u64) -> *mut core::ffi::c_void {
         unsafe {
             self.device
@@ -152,6 +167,7 @@ impl VEMemoryChunk {
         }
     }
 
+    #[instrument]
     pub fn unmap(&self) {
         unsafe {
             self.device.device.unmap_memory(self.handle);
@@ -160,6 +176,7 @@ impl VEMemoryChunk {
 }
 
 impl Drop for VEMemoryChunk {
+    #[instrument]
     fn drop(&mut self) {
         unsafe { self.device.device.free_memory(self.handle, None) };
     }

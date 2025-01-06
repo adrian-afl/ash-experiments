@@ -91,7 +91,7 @@ impl VEImage {
 
         command_buffer.end();
 
-        command_buffer.submit(&queue, &[], &[]);
+        command_buffer.submit(&queue, &mut [], &mut []);
         queue.wait_idle();
 
         empty.transition_layout(

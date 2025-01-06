@@ -2,10 +2,18 @@ use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
 
+#[derive(Debug, PartialEq)]
+pub enum SemaphoreState {
+    Fresh,
+    Pending,
+    Awaited
+}
+
 #[derive(Debug)]
 pub struct VESemaphore {
     device: Arc<VEDevice>,
     pub handle: vk::Semaphore,
+    pub state: SemaphoreState
 }
 
 impl VESemaphore {
@@ -13,7 +21,7 @@ impl VESemaphore {
         let info = vk::SemaphoreCreateInfo::default();
         let handle = unsafe { device.device.create_semaphore(&info, None).unwrap() };
 
-        VESemaphore { device, handle }
+        VESemaphore { device, handle, state: SemaphoreState::Fresh }
     }
 }
 
