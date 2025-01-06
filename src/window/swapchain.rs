@@ -194,7 +194,7 @@ impl VESwapchain {
 
         self.swapchain_loader = swapchain_loader;
         self.swapchain = swapchain;
-        println!("new size 2 {:?}", new_size);
+
         self.width = new_size.width;
         self.height = new_size.height;
 
@@ -292,8 +292,8 @@ impl VESwapchain {
                 .swapchain_loader
                 .queue_present(self.main_device_queue.main_queue, &info);
             match result {
-                Ok(_) => (),
-                Err(e) => (), //println!("Swapchain lost at present, {:?}", e),
+                Ok(_) => (), // ignore errors
+                Err(_) => (),
             }
         }
     }
@@ -310,12 +310,8 @@ impl VESwapchain {
         };
         match result {
             Ok(res) => res.0,
-            Err(e) => {
-                // println!("Swapchain lost at acquire, {:?}, width {}", e, self.width);
-                // if let Some(window) = self.window.as_ref() {
-                //     self.recreate(window.clone());
-                // }
-                0
+            Err(_) => {
+                0 // ignore errors
             }
         }
     }

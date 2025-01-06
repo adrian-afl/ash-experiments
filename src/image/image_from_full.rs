@@ -103,7 +103,7 @@ impl VEImage {
             command_pool,
             memory_manager,
 
-            allocation,
+            allocation: Some(allocation),
 
             width,
             height,

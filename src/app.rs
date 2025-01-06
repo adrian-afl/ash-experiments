@@ -26,6 +26,8 @@ pub struct MyApp {
     render_stage: Arc<VERenderStage>,
     render_done_semaphore: VESemaphore,
     scheduler: VEScheduler,
+    depth_buffer: VEImage,
+    color_buffer: Arc<VEImage>,
     elapsed: f32,
 }
 
@@ -119,7 +121,7 @@ impl MyApp {
         let mut scheduler = toolkit.make_scheduler(2);
 
         let render_item = scheduler.make_render_item(render_stage.clone());
-        let blit_item = scheduler.make_blit_item(color_buffer);
+        let blit_item = scheduler.make_blit_item(color_buffer.clone());
 
         scheduler.set_layer(0, vec![render_item]);
         scheduler.set_layer(1, vec![blit_item]);
@@ -140,6 +142,8 @@ impl MyApp {
             sampler,
             scheduler,
             uniform_buffer,
+            depth_buffer,
+            color_buffer,
             elapsed: 0.0,
         }
     }

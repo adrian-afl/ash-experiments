@@ -7,7 +7,6 @@ use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
-use tracing::instrument;
 
 #[path = "./image_from_data.rs"]
 mod image_from_data;
@@ -37,7 +36,7 @@ pub struct VEImage {
 
     pub current_layout: vk::ImageLayout,
 
-    allocation: VESingleAllocation,
+    allocation: Option<VESingleAllocation>,
     pub handle: vk::Image,
     pub view: Option<vk::ImageView>,
 }
@@ -68,13 +67,17 @@ impl VEImage {
     }
 }
 
-// impl Drop for VEImage {
-//     fn drop(&mut self) {
-//         unsafe {
-//             if let Some(view) = self.view {
-//                 self.device.device.destroy_image_view(view, None);
-//             }
-//             self.device.device.destroy_image(self.handle, None);
-//         }
-//     }
-// }
+impl Drop for VEImage {
+    fn drop(&mut self) {
+        if let Some(_) = self.allocation {
+            // only free the ones that app allocated, not swapchain, for example
+            // probably this should be handled differently
+            unsafe {
+                if let Some(view) = self.view {
+                    self.device.device.destroy_image_view(view, None);
+                }
+                self.device.device.destroy_image(self.handle, None);
+            }
+        }
+    }
+}

@@ -60,9 +60,7 @@ impl AppCallback for VEToolkitCallbacks {
     }
 
     fn on_window_resize(&self, new_size: PhysicalSize<u32>) {
-        println!("new size {:?}", new_size);
         self.toolkit.as_ref().unwrap().device.wait_idle();
-        println!("Is window {:?}", self.window);
         self.toolkit
             .as_ref()
             .unwrap()
@@ -84,11 +82,10 @@ impl VEToolkit {
             app: None,
             create_app,
         }));
-        println!("Setting window");
         callbacks.lock().unwrap().window = Some(Arc::new(VEWindow::new(
             callbacks.clone(),
             initial_window_attributes,
-        ))); //oh god i hope this won't race condition with event loop
+        )));
     }
 
     pub fn new(window: &VEWindow) -> VEToolkit {

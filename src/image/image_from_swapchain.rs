@@ -26,12 +26,7 @@ impl VEImage {
             command_pool,
             memory_manager,
 
-            allocation: VESingleAllocation {
-                alloc_identifier: u64::MAX,
-                chunk_identifier: u64::MAX,
-                size: 0,
-                offset: 0,
-            },
+            allocation: None,
 
             width,
             height,
