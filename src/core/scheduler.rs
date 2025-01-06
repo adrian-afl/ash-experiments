@@ -1,12 +1,11 @@
 use crate::compute::compute_stage::VEComputeStage;
+use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::semaphore::VESemaphore;
-use crate::core::toolkit::VEToolkit;
 use crate::graphics::render_stage::VERenderStage;
 use crate::image::image::VEImage;
-use std::cell::RefCell;
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex, MutexGuard};
-use tokio::sync::Semaphore;
+use crate::window::swapchain::VESwapchain;
+use std::sync::{Arc, Mutex};
 
 struct BlitStage {
     pub source: Arc<VEImage>,
@@ -19,7 +18,6 @@ enum Stage {
 }
 
 pub struct ScheduleItem {
-    pub name: String,
     pub stage: Stage,
     pub semaphore: Arc<Mutex<VESemaphore>>,
 }
@@ -29,54 +27,49 @@ struct ScheduleLayer {
 }
 
 pub struct VEScheduler {
+    device: Arc<VEDevice>,
+    swapchain: Arc<Mutex<VESwapchain>>,
+    queue: Arc<VEMainDeviceQueue>,
     layers: Vec<Arc<Mutex<ScheduleLayer>>>,
 }
 
 impl VEScheduler {
-    pub fn new(layers_count: u8) -> VEScheduler {
+    pub fn new(
+        device: Arc<VEDevice>,
+        swapchain: Arc<Mutex<VESwapchain>>,
+        queue: Arc<VEMainDeviceQueue>,
+        layers_count: u8,
+    ) -> VEScheduler {
         let mut layers = vec![];
         for i in 0..layers_count {
             layers.push(Arc::new(Mutex::from(ScheduleLayer { items: vec![] })));
         }
-        VEScheduler { layers }
+        VEScheduler {
+            device,
+            swapchain,
+            queue,
+            layers,
+        }
     }
 
-    pub fn make_render_item(
-        &self,
-        toolkit: &VEToolkit,
-        name: &str,
-        stage: Arc<VERenderStage>,
-    ) -> Arc<Mutex<ScheduleItem>> {
+    pub fn make_render_item(&self, stage: Arc<VERenderStage>) -> Arc<Mutex<ScheduleItem>> {
         Arc::new(Mutex::from(ScheduleItem {
-            name: name.to_string(),
             stage: Stage::Render(stage),
-            semaphore: Arc::new(Mutex::from(toolkit.make_semaphore())),
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
         }))
     }
 
-    pub fn make_compute_item(
-        &self,
-        toolkit: &VEToolkit,
-        name: &str,
-        stage: Arc<VEComputeStage>,
-    ) -> Arc<Mutex<ScheduleItem>> {
+    pub fn make_compute_item(&self, stage: Arc<VEComputeStage>) -> Arc<Mutex<ScheduleItem>> {
         Arc::new(Mutex::from(ScheduleItem {
-            name: name.to_string(),
             stage: Stage::Compute(stage),
-            semaphore: Arc::new(Mutex::from(toolkit.make_semaphore())),
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
         }))
     }
 
-    pub fn make_blit_item(
-        &self,
-        toolkit: &VEToolkit,
-        name: &str,
-        source: Arc<VEImage>,
-    ) -> Arc<Mutex<ScheduleItem>> {
+    pub fn make_blit_item(&self, source: Arc<VEImage>) -> Arc<Mutex<ScheduleItem>> {
         Arc::new(Mutex::from(ScheduleItem {
-            name: name.to_string(),
             stage: Stage::Blit(BlitStage { source }),
-            semaphore: Arc::new(Mutex::from(toolkit.make_semaphore())),
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
         }))
     }
 
@@ -84,8 +77,8 @@ impl VEScheduler {
         self.layers[index as usize].lock().unwrap().items = items;
     }
 
-    pub fn run(&mut self, toolkit: &VEToolkit) {
-        let mut swapchain = toolkit.swapchain.lock().unwrap();
+    pub fn run(&mut self) {
+        let mut swapchain = self.swapchain.lock().unwrap();
         let blit_semaphore = &swapchain.blit_done_semaphore;
 
         let non_empty_layers: Vec<&Arc<Mutex<ScheduleLayer>>> = self
@@ -116,7 +109,7 @@ impl VEScheduler {
         }
 
         non_empty_layers.iter().enumerate().for_each(|(i, layer)| {
-            println!("LAYER {i}");
+            // println!("LAYER {i}");
             let mut layer = layer.lock().unwrap();
             let previous_i = if i == 0 {
                 non_empty_layers.len() - 1
@@ -137,7 +130,7 @@ impl VEScheduler {
             let items = &layer.items;
             for h in 0..items.len() {
                 let item = items[h].lock().unwrap();
-                println!("ITEM {}", item.name);
+                // println!("ITEM {}", item.name);
                 match &item.stage {
                     Stage::Compute(stage) => {
                         let mut previous_semaphores: Vec<Arc<Mutex<VESemaphore>>> = vec![];
@@ -145,7 +138,7 @@ impl VEScheduler {
                             previous_semaphores.push(layer_semaphores[previous_i][x].clone());
                         }
                         stage.command_buffer.submit(
-                            &toolkit.queue,
+                            &self.queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
                         )
@@ -156,7 +149,7 @@ impl VEScheduler {
                             previous_semaphores.push(layer_semaphores[previous_i][x].clone());
                         }
                         stage.command_buffer.submit(
-                            &toolkit.queue,
+                            &self.queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
                         )

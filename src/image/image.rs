@@ -1,4 +1,3 @@
-use std::fmt::{Debug, Formatter};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
@@ -6,6 +5,7 @@ use crate::image::transition_image_layout::transition_image_layout;
 use crate::memory::memory_chunk::VESingleAllocation;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
+use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
@@ -67,3 +67,14 @@ impl VEImage {
         self.current_layout = to_layout;
     }
 }
+
+// impl Drop for VEImage {
+//     fn drop(&mut self) {
+//         unsafe {
+//             if let Some(view) = self.view {
+//                 self.device.device.destroy_image_view(view, None);
+//             }
+//             self.device.device.destroy_image(self.handle, None);
+//         }
+//     }
+// }

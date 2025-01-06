@@ -237,4 +237,10 @@ impl VEDevice {
 
         panic!("No suitable memory type found");
     }
+
+    pub fn wait_idle(&self) {
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+        }
+    }
 }

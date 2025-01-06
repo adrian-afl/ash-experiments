@@ -116,10 +116,10 @@ impl<'a> VECommandBuffer {
 
         let command_buffer_handles = [self.handle];
 
-        println!(
-            "SUBMIT Wait For {:?}, Signal {:?}",
-            wait_handles, signal_handles
-        );
+        // println!(
+        //     "SUBMIT Wait For {:?}, Signal {:?}",
+        //     wait_handles, signal_handles
+        // );
         let submit_info = vk::SubmitInfo::default()
             .signal_semaphores(&signal_handles)
             .wait_semaphores(&wait_handles)

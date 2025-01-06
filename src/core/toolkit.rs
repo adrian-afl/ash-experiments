@@ -5,6 +5,7 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::descriptor_set_layout::{VEDescriptorSetLayout, VEDescriptorSetLayoutField};
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::{VEShaderModule, VEShaderModuleType};
 use crate::graphics::attachment::VEAttachment;
@@ -17,9 +18,9 @@ use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::VESwapchain;
 use crate::window::window::{AppCallback, VEWindow};
 use ash::vk;
-use ash::vk::{DeviceSize, MemoryPropertyFlags, ShaderModule};
 use std::sync::{Arc, Mutex};
 use std::{fs, io};
+use winit::dpi::PhysicalSize;
 use winit::window::WindowAttributes;
 
 pub trait App {
@@ -57,6 +58,19 @@ impl AppCallback for VEToolkitCallbacks {
             .unwrap()
             .draw(self.toolkit.as_ref().unwrap());
     }
+
+    fn on_window_resize(&self, new_size: PhysicalSize<u32>) {
+        println!("new size {:?}", new_size);
+        self.toolkit.as_ref().unwrap().device.wait_idle();
+        println!("Is window {:?}", self.window);
+        self.toolkit
+            .as_ref()
+            .unwrap()
+            .swapchain
+            .lock()
+            .unwrap()
+            .recreate(new_size);
+    }
 }
 
 impl VEToolkit {
@@ -70,6 +84,7 @@ impl VEToolkit {
             app: None,
             create_app,
         }));
+        println!("Setting window");
         callbacks.lock().unwrap().window = Some(Arc::new(VEWindow::new(
             callbacks.clone(),
             initial_window_attributes,
@@ -212,8 +227,8 @@ impl VEToolkit {
     pub fn make_buffer(
         &self,
         typ: VEBufferType,
-        size: DeviceSize,
-        memory_properties: MemoryPropertyFlags,
+        size: vk::DeviceSize,
+        memory_properties: vk::MemoryPropertyFlags,
     ) -> VEBuffer {
         VEBuffer::new(
             self.device.clone(),
@@ -278,6 +293,15 @@ impl VEToolkit {
             vertex_attributes,
             primitive_topology,
             cull_mode,
+        )
+    }
+
+    pub fn make_scheduler(&self, layers_count: u8) -> VEScheduler {
+        VEScheduler::new(
+            self.device.clone(),
+            self.swapchain.clone(),
+            self.queue.clone(),
+            layers_count,
         )
     }
 }

@@ -1,8 +1,9 @@
-use crate::core::command_buffer::VECommandBuffer;
+use crate::buffer::buffer::{VEBuffer, VEBufferType};
 use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
 };
+use crate::core::helpers::{make_clear_color_f32, make_clear_depth};
 use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::VEShaderModuleType;
@@ -15,40 +16,44 @@ use crate::image::image::VEImage;
 use crate::image::sampler::VESampler;
 use ash::vk;
 use std::sync::Arc;
-use tracing::{event, Level};
 
 pub struct MyApp {
     texture: VEImage,
     sampler: VESampler,
     vertex_buffer: VEVertexBuffer,
+    uniform_buffer: VEBuffer,
     descriptor_set: VEDescriptorSet,
     render_stage: Arc<VERenderStage>,
     render_done_semaphore: VESemaphore,
     scheduler: VEScheduler,
+    elapsed: f32,
 }
 
 impl MyApp {
     pub fn new(toolkit: &VEToolkit) -> MyApp {
-        let command_buffer = toolkit.make_command_buffer();
-
         let vertex_shader = toolkit.make_shader_module("vertex.spv", VEShaderModuleType::Vertex);
         let fragment_shader =
             toolkit.make_shader_module("fragment.spv", VEShaderModuleType::Fragment);
 
-        let mut descriptor_set_layout =
-            toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+        let mut descriptor_set_layout = toolkit.make_descriptor_set_layout(&[
+            VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::Sampler,
                 stage: VEDescriptorSetFieldStage::Fragment,
-            }]);
+            },
+            VEDescriptorSetLayoutField {
+                binding: 1,
+                typ: VEDescriptorSetFieldType::UniformBuffer,
+                stage: VEDescriptorSetFieldStage::AllGraphics,
+            },
+        ]);
 
         let descriptor_set = descriptor_set_layout.create_descriptor_set();
-        // descriptor_set.bind_buffer(0, &buffer);
 
         let width = 640;
         let height = 480;
 
-        let mut color_buffer = Arc::from(toolkit.make_image_full(
+        let color_buffer = Arc::from(toolkit.make_image_full(
             width,
             height,
             1,
@@ -58,16 +63,10 @@ impl MyApp {
             vk::MemoryPropertyFlags::empty(),
         ));
 
-        // color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
-
         let color_attachment = VEAttachment::from_image(
             &color_buffer,
             None,
-            Some(vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 1.0, 1.0],
-                },
-            }),
+            Some(make_clear_color_f32([0.0, 0.0, 1.0, 1.0])),
             false,
         );
 
@@ -81,17 +80,8 @@ impl MyApp {
             vk::MemoryPropertyFlags::empty(),
         );
 
-        let depth_attachment = VEAttachment::from_image(
-            &depth_buffer,
-            None,
-            Some(vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            }),
-            false,
-        );
+        let depth_attachment =
+            VEAttachment::from_image(&depth_buffer, None, Some(make_clear_depth(1.0)), false);
 
         let vertex_attributes = [
             VertexAttribFormat::RGB32f,
@@ -126,13 +116,20 @@ impl MyApp {
 
         descriptor_set.bind_image_sampler(0, &texture, &sampler);
 
-        let mut scheduler = VEScheduler::new(2);
+        let mut scheduler = toolkit.make_scheduler(2);
 
-        let render_item = scheduler.make_render_item(toolkit, "render", render_stage.clone());
-        let blit_item = scheduler.make_blit_item(toolkit, "blit", color_buffer);
+        let render_item = scheduler.make_render_item(render_stage.clone());
+        let blit_item = scheduler.make_blit_item(color_buffer);
 
         scheduler.set_layer(0, vec![render_item]);
         scheduler.set_layer(1, vec![blit_item]);
+
+        let uniform_buffer = toolkit.make_buffer(
+            VEBufferType::Uniform,
+            128,
+            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+        );
+        descriptor_set.bind_buffer(1, &uniform_buffer);
 
         MyApp {
             render_done_semaphore: toolkit.make_semaphore(),
@@ -142,12 +139,22 @@ impl MyApp {
             texture,
             sampler,
             scheduler,
+            uniform_buffer,
+            elapsed: 0.0,
         }
     }
 }
 
 impl App for MyApp {
     fn draw(&mut self, toolkit: &VEToolkit) {
+        let pointer = self.uniform_buffer.map() as *mut f32;
+
+        unsafe {
+            pointer.write(self.elapsed);
+        }
+
+        self.uniform_buffer.unmap();
+
         self.render_stage.begin_recording();
 
         self.render_stage
@@ -157,6 +164,8 @@ impl App for MyApp {
 
         self.render_stage.end_recording();
 
-        self.scheduler.run(toolkit);
+        self.scheduler.run();
+
+        self.elapsed += 0.01;
     }
 }

@@ -7,6 +7,7 @@ use crate::image::image::VEImage;
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::window::VEWindow;
 use ash::khr::swapchain;
+use ash::prelude::VkResult;
 use ash::vk;
 use ash::vk::{
     CommandBufferUsageFlags, PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR,
@@ -16,29 +17,16 @@ use std::fmt::{Debug, Formatter};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tracing::{event, instrument, Level};
-
-struct SwapChainSupportDetails {
-    surface_capabilities: SurfaceCapabilitiesKHR,
-    formats: Vec<SurfaceFormatKHR>,
-    present_modes: Vec<PresentModeKHR>,
-}
-
-impl SwapChainSupportDetails {
-    fn default() -> Self {
-        Self {
-            surface_capabilities: SurfaceCapabilitiesKHR::default(),
-            formats: Vec::new(),
-            present_modes: Vec::new(),
-        }
-    }
-}
+use winit::dpi::PhysicalSize;
 
 pub struct VESwapchain {
     device: Arc<VEDevice>,
+    main_device_queue: Arc<VEMainDeviceQueue>,
+    command_pool: Arc<VECommandPool>,
+    memory_manager: Arc<Mutex<VEMemoryManager>>,
+
     swapchain: SwapchainKHR,
     swapchain_loader: swapchain::Device,
-    main_device_queue: Arc<VEMainDeviceQueue>,
-
     pub present_images: Vec<VEImage>,
     pub width: u32,
     pub height: u32,
@@ -64,6 +52,42 @@ impl VESwapchain {
         memory_manager: Arc<Mutex<VEMemoryManager>>,
     ) -> VESwapchain {
         let winit_window = window.window.as_ref().unwrap();
+
+        let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
+            device.clone(),
+            main_device_queue.clone(),
+            command_pool.clone(),
+            memory_manager.clone(),
+            winit_window.inner_size(),
+        );
+
+        VESwapchain {
+            device: device.clone(),
+            swapchain,
+            swapchain_loader,
+            present_images,
+            main_device_queue,
+            command_pool: command_pool.clone(),
+            memory_manager,
+
+            width: winit_window.inner_size().width,
+            height: winit_window.inner_size().height,
+
+            acquire_ready_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
+            blit_done_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
+            present_command_buffer: VECommandBuffer::new(device.clone(), command_pool),
+        }
+    }
+
+    fn create_swapchain_images(
+        device: Arc<VEDevice>,
+        main_device_queue: Arc<VEMainDeviceQueue>,
+        command_pool: Arc<VECommandPool>,
+        memory_manager: Arc<Mutex<VEMemoryManager>>,
+        new_size: PhysicalSize<u32>,
+    ) -> (SwapchainKHR, swapchain::Device, Vec<VEImage>) {
+        let swapchain_loader = swapchain::Device::new(&device.instance, &device.device);
+        // let winit_window = window.window.as_ref().unwrap();
         let surface_format = unsafe {
             device
                 .surface_loader
@@ -85,8 +109,8 @@ impl VESwapchain {
         }
         let surface_resolution = match surface_capabilities.current_extent.width {
             u32::MAX => vk::Extent2D {
-                width: winit_window.inner_size().width,
-                height: winit_window.inner_size().height,
+                width: new_size.width,
+                height: new_size.height,
             },
             _ => surface_capabilities.current_extent,
         };
@@ -109,7 +133,6 @@ impl VESwapchain {
             .cloned()
             .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
             .unwrap_or(vk::PresentModeKHR::FIFO);
-        let swapchain_loader = swapchain::Device::new(&device.instance, &device.device);
 
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::default()
             .surface(device.surface)
@@ -147,21 +170,36 @@ impl VESwapchain {
                 present_images_raw[i],
             ))
         }
+        (swapchain, swapchain_loader, present_images)
+    }
 
-        VESwapchain {
-            device: device.clone(),
-            swapchain,
-            swapchain_loader,
-            present_images,
-            main_device_queue,
+    #[instrument]
+    pub fn recreate(&mut self, new_size: PhysicalSize<u32>) {
+        self.present_images.clear();
 
-            width: surface_resolution.width,
-            height: surface_resolution.height,
-
-            acquire_ready_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
-            blit_done_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
-            present_command_buffer: VECommandBuffer::new(device.clone(), command_pool),
+        unsafe {
+            self.swapchain_loader
+                .destroy_swapchain(self.swapchain, None);
         }
+
+        let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
+            self.device.clone(),
+            self.main_device_queue.clone(),
+            self.command_pool.clone(),
+            self.memory_manager.clone(),
+            new_size,
+        );
+
+        self.present_images = present_images;
+
+        self.swapchain_loader = swapchain_loader;
+        self.swapchain = swapchain;
+        println!("new size 2 {:?}", new_size);
+        self.width = new_size.width;
+        self.height = new_size.height;
+
+        self.blit_done_semaphore.lock().unwrap().recreate();
+        self.acquire_ready_semaphore.lock().unwrap().recreate();
     }
 
     #[instrument]
@@ -250,9 +288,13 @@ impl VESwapchain {
             .swapchains(&swapchains)
             .image_indices(&images);
         unsafe {
-            self.swapchain_loader
-                .queue_present(self.main_device_queue.main_queue, &info)
-                .unwrap();
+            let result = self
+                .swapchain_loader
+                .queue_present(self.main_device_queue.main_queue, &info);
+            match result {
+                Ok(_) => (),
+                Err(e) => (), //println!("Swapchain lost at present, {:?}", e),
+            }
         }
     }
 
@@ -266,6 +308,15 @@ impl VESwapchain {
                 vk::Fence::null(),
             )
         };
-        result.unwrap().0
+        match result {
+            Ok(res) => res.0,
+            Err(e) => {
+                // println!("Swapchain lost at acquire, {:?}, width {}", e, self.width);
+                // if let Some(window) = self.window.as_ref() {
+                //     self.recreate(window.clone());
+                // }
+                0
+            }
+        }
     }
 }

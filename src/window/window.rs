@@ -12,6 +12,7 @@ use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: VEToolkit);
     fn on_window_draw(&self);
+    fn on_window_resize(&self, new_size: PhysicalSize<u32>);
 }
 
 pub struct VEWindow {
@@ -53,6 +54,9 @@ impl ApplicationHandler for VEWindow {
                 window.pre_present_notify();
                 self.app.lock().unwrap().on_window_draw();
                 window.request_redraw();
+            }
+            WindowEvent::Resized(new_size) => {
+                self.app.lock().unwrap().on_window_resize(new_size);
             }
             _ => (),
         }
