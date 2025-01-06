@@ -10,7 +10,7 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     outColor = vec4(
-        texture(tex, UV).rgb * (dot(normalize(Normal), vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5), 
+        texture(tex, vec2(UV.x, 1.0 - UV.y)).rgb * (dot(normalize(Normal), vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5), 
         1.0
     );
 }

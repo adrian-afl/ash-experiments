@@ -32,8 +32,8 @@ mat3 rotationMatrix(vec3 axis, float angle)
 void main() {
     mat3 rotmat = rotationMatrix(vec3(0, 1, 0), buff.Time);
     vec3 pos = rotmat * inPosition.xyz;
-    pos.z *= -1.0;
-    gl_Position = vec4(pos.xyz * 0.5, 1.0);
+    vec4 ndc = vec4(pos.xyz * 0.5, 1.0);
+    gl_Position = ndc;
     outTexCoord = inTexCoord;
     outNormal = inNormal;
 }

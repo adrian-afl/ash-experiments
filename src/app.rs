@@ -153,7 +153,7 @@ impl MyApp {
             &fragment_shader,
             &vertex_attributes,
             VEPrimitiveTopology::TriangleList,
-            VECullMode::None,
+            VECullMode::Back,
         ));
 
         MeshStage {

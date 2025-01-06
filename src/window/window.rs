@@ -68,7 +68,7 @@ impl ApplicationHandler for VEWindow {
         device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        println!("{:?}, {:?}", device_id, event);
+        // println!("{:?}, {:?}", device_id, event);
     }
 }
 
