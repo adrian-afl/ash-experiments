@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
@@ -17,7 +18,7 @@ mod image_from_full;
 #[path = "./image_from_swapchain.rs"]
 mod image_from_swapchain;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct VEImage {
     device: Arc<VEDevice>,
     queue: Arc<VEMainDeviceQueue>,
@@ -39,6 +40,12 @@ pub struct VEImage {
     allocation: VESingleAllocation,
     pub handle: vk::Image,
     pub view: vk::ImageView,
+}
+
+impl Debug for VEImage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VEImage")
+    }
 }
 
 impl VEImage {

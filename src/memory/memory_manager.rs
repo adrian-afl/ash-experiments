@@ -2,15 +2,21 @@ use crate::core::device::VEDevice;
 use crate::memory::memory_chunk::{VEMemoryChunk, VESingleAllocation};
 use ash::vk::{Buffer, Image};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use tracing::instrument;
 
-#[derive(Debug)]
 pub struct VEMemoryManager {
     device: Arc<VEDevice>,
     chunks: HashMap<u32, Vec<VEMemoryChunk>>,
     identifier_counter: u64,
     mapped: bool,
+}
+
+impl Debug for VEMemoryManager {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VEMemoryManager")
+    }
 }
 
 impl VEMemoryManager {

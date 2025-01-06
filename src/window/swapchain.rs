@@ -275,7 +275,7 @@ impl VESwapchain {
         }
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> u32 {
         let result = unsafe {
             self.swapchain_loader.acquire_next_image(

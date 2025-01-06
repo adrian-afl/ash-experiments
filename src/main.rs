@@ -7,28 +7,29 @@ mod image;
 mod memory;
 mod window;
 
+use std::fs::File;
 use crate::app::MyApp;
 use crate::core::toolkit::{App, VEToolkit};
 use std::sync::{Arc, Mutex};
 use tokio::main;
 use tracing::Level;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::FmtSubscriber;
 use winit::dpi::PhysicalSize;
 use winit::window::WindowAttributes;
 
 #[main]
 async fn main() {
-    env_logger::init();
-
-    // a builder for `FmtSubscriber`.
     let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
+        .with_writer(File::create("log.txt").unwrap())
+        .with_span_events(FmtSpan::FULL)
         .with_max_level(Level::TRACE)
-        // completes the builder.
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    tracing::trace!("Subscriber test message");
+
     let window_attributes = WindowAttributes::default()
         .with_inner_size(PhysicalSize::new(1280, 720))
         .with_title("planetdraw-rs");
