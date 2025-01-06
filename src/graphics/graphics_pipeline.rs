@@ -96,7 +96,7 @@ impl VEGraphicsPipeline {
         //for att in render_pass.attachments {
         for i in 0..attachments.len() {
             let att = &attachments[i];
-            if !att.image.is_depth() {
+            if !att.is_depth {
                 // not a depth buffer
                 let mut blend_state = vk::PipelineColorBlendAttachmentState::default()
                     .color_write_mask(ColorComponentFlags::RGBA);

@@ -34,8 +34,8 @@ async fn main() {
         .with_title("planetdraw-rs");
 
     VEToolkit::start(
-        Box::from(|toolkit: Arc<VEToolkit>| {
-            let app = MyApp::new(toolkit);
+        Box::from(|toolkit: &VEToolkit| {
+            let app = MyApp::new(&toolkit);
             Arc::new(Mutex::from(app)) as Arc<Mutex<dyn App>>
         }),
         window_attributes,

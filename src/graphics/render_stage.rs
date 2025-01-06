@@ -21,7 +21,6 @@ pub struct VERenderStage {
     pipeline: Arc<VEGraphicsPipeline>,
     render_pass: VERenderPass,
     framebuffer: VEFrameBuffer,
-    sets: Vec<Arc<VEDescriptorSet>>,
     viewport_width: u32,
     viewport_height: u32,
     clear_values: Vec<vk::ClearValue>,
@@ -54,8 +53,8 @@ impl VERenderStage {
         };
 
         let color_attas: Vec<&&VEAttachment> =
-            attachments.iter().filter(|x| !x.image.is_depth()).collect();
-        let depth_atta = attachments.iter().filter(|x| x.image.is_depth()).last();
+            attachments.iter().filter(|x| !x.is_depth).collect();
+        let depth_atta = attachments.iter().filter(|x| x.is_depth).last();
 
         let color_references: Vec<vk::AttachmentReference> = (0..color_attas.len())
             .map(|i| create_subpass_attachment_reference(i as i32, false))
@@ -111,7 +110,6 @@ impl VERenderStage {
             framebuffer,
             viewport_width,
             viewport_height,
-            sets: vec![],
             clear_values,
         }
     }
@@ -119,25 +117,16 @@ impl VERenderStage {
     pub fn set_descriptor_set(
         &mut self,
         command_buffer: &VECommandBuffer,
-        index: usize,
-        set: Arc<VEDescriptorSet>,
+        index: u32,
+        set: &VEDescriptorSet,
     ) {
-        while self.sets.len() <= index {
-            self.sets.push(set.clone()); // TODO weird but can work
-        }
-        self.sets[index] = set;
-        self.bind_descriptor_sets(command_buffer);
-    }
-
-    fn bind_descriptor_sets(&self, command_buffer: &VECommandBuffer) {
-        let handles: Vec<vk::DescriptorSet> = self.sets.iter().map(|x| x.set).collect();
         unsafe {
             self.device.device.cmd_bind_descriptor_sets(
                 command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.layout,
-                0,
-                &handles,
+                index,
+                &[set.set],
                 &[],
             );
         }

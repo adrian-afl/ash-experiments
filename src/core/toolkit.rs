@@ -35,17 +35,17 @@ pub struct VEToolkit {
 }
 
 pub struct VEToolkitCallbacks {
-    toolkit: Option<Arc<VEToolkit>>,
+    toolkit: Option<VEToolkit>,
     pub window: Option<Arc<VEWindow>>,
-    create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
+    create_app: Box<dyn Fn(&VEToolkit) -> Arc<Mutex<dyn App>>>,
     app: Option<Arc<Mutex<dyn App>>>,
 }
 
 impl AppCallback for VEToolkitCallbacks {
-    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>) {
-        self.toolkit = Some(toolkit.clone());
+    fn on_window_ready(&mut self, toolkit: VEToolkit) {
+        self.toolkit = Some(toolkit);
         let constructor = &self.create_app;
-        let app = constructor(toolkit.clone());
+        let app = constructor(self.toolkit.as_ref().unwrap());
         self.app = Some(app);
     }
 
@@ -61,7 +61,7 @@ impl AppCallback for VEToolkitCallbacks {
 
 impl VEToolkit {
     pub fn start(
-        create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
+        create_app: Box<dyn Fn(&VEToolkit) -> Arc<Mutex<dyn App>>>,
         initial_window_attributes: WindowAttributes,
     ) {
         let callbacks = Arc::new(Mutex::from(VEToolkitCallbacks {

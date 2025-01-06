@@ -19,15 +19,15 @@ pub struct MyApp {
     texture: VEImage,
     sampler: VESampler,
     vertex_buffer: VEVertexBuffer,
-    descriptor_set: Arc<VEDescriptorSet>,
+    descriptor_set: VEDescriptorSet,
     command_buffer: VECommandBuffer,
     render_stage: VERenderStage,
     render_done_semaphore: VESemaphore,
-    result_image: Arc<VEImage>,
+    result_image: VEImage,
 }
 
 impl MyApp {
-    pub fn new(toolkit: Arc<VEToolkit>) -> MyApp {
+    pub fn new(toolkit: &VEToolkit) -> MyApp {
         let command_buffer = toolkit.make_command_buffer();
 
         let vertex_shader = toolkit.make_shader_module("vertex.spv", VEShaderModuleType::Vertex);
@@ -41,7 +41,7 @@ impl MyApp {
                 stage: VEDescriptorSetFieldStage::Fragment,
             }]);
 
-        let descriptor_set = Arc::new(descriptor_set_layout.create_descriptor_set());
+        let descriptor_set = descriptor_set_layout.create_descriptor_set();
         // descriptor_set.bind_buffer(0, &buffer);
 
         let width = 640;
@@ -59,10 +59,8 @@ impl MyApp {
 
         color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
 
-        let color_buffer = Arc::new(color_buffer);
-
         let color_attachment = VEAttachment::from_image(
-            color_buffer.clone(),
+            &color_buffer,
             None,
             Some(vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -72,7 +70,7 @@ impl MyApp {
             false,
         );
 
-        let depth_buffer = Arc::new(toolkit.make_image_full(
+        let depth_buffer = toolkit.make_image_full(
             width,
             height,
             1,
@@ -80,10 +78,10 @@ impl MyApp {
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             vk::MemoryPropertyFlags::empty(),
-        ));
+        );
 
         let depth_attachment = VEAttachment::from_image(
-            depth_buffer,
+            &depth_buffer,
             None,
             Some(vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
@@ -145,7 +143,7 @@ impl App for MyApp {
         self.render_stage.begin_recording(&self.command_buffer);
 
         self.render_stage
-            .set_descriptor_set(&self.command_buffer, 0, self.descriptor_set.clone());
+            .set_descriptor_set(&self.command_buffer, 0, &self.descriptor_set);
 
         self.vertex_buffer.draw_instanced(&self.command_buffer, 1);
 
@@ -159,11 +157,6 @@ impl App for MyApp {
             &[&self.render_done_semaphore],
         );
 
-        toolkit.queue.wait_idle();
-
         swapchain.blit(&self.result_image, &[&self.render_done_semaphore]);
-
-        toolkit.queue.wait_idle();
-        // winit_window.pre_present_notify();
     }
 }

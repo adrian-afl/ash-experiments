@@ -17,7 +17,7 @@ impl VEFrameBuffer {
         render_pass: &VERenderPass,
         attachments: &[&VEAttachment],
     ) -> VEFrameBuffer {
-        let image_views: Vec<vk::ImageView> = attachments.iter().map(|a| a.image.view).collect();
+        let image_views: Vec<vk::ImageView> = attachments.iter().map(|a| a.image_view).collect();
 
         let create_info = vk::FramebufferCreateInfo::default()
             .attachments(&image_views)

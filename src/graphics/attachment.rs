@@ -8,7 +8,8 @@ pub enum AttachmentBlending {
 }
 
 pub struct VEAttachment {
-    pub image: Arc<VEImage>,
+    pub image_view: vk::ImageView,
+    pub is_depth: bool,
     pub description: vk::AttachmentDescription,
     pub blending: Option<AttachmentBlending>,
     pub clear: Option<vk::ClearValue>,
@@ -16,7 +17,7 @@ pub struct VEAttachment {
 
 impl VEAttachment {
     pub fn from_image(
-        image: Arc<VEImage>,
+        image: &VEImage,
         blending: Option<AttachmentBlending>,
         clear: Option<vk::ClearValue>,
         for_present: bool,
@@ -42,7 +43,8 @@ impl VEAttachment {
             });
 
         VEAttachment {
-            image,
+            image_view: image.view,
+            is_depth: image.is_depth(),
             description,
             blending,
             clear,
