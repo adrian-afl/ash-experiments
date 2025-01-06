@@ -1,6 +1,23 @@
 use crate::core::device::VEDevice;
+use crate::image::filtering::{get_filtering, VEFiltering};
 use ash::vk;
 use std::sync::Arc;
+
+pub enum VESamplerAddressMode {
+    Repeat,
+    MirroredRepeat,
+    ClampToEdge,
+    ClampToBorder,
+}
+
+fn get_sampler_address_mode(mode: VESamplerAddressMode) -> vk::SamplerAddressMode {
+    match mode {
+        VESamplerAddressMode::Repeat => vk::SamplerAddressMode::REPEAT,
+        VESamplerAddressMode::MirroredRepeat => vk::SamplerAddressMode::MIRRORED_REPEAT,
+        VESamplerAddressMode::ClampToEdge => vk::SamplerAddressMode::CLAMP_TO_EDGE,
+        VESamplerAddressMode::ClampToBorder => vk::SamplerAddressMode::CLAMP_TO_BORDER,
+    }
+}
 
 pub struct VESampler {
     device: Arc<VEDevice>,
@@ -10,13 +27,17 @@ pub struct VESampler {
 impl VESampler {
     pub fn new(
         device: Arc<VEDevice>,
-        sampler_address_mode: vk::SamplerAddressMode,
+        sampler_address_mode: VESamplerAddressMode,
 
-        min_filter: vk::Filter,
-        mag_filter: vk::Filter,
+        min_filter: VEFiltering,
+        mag_filter: VEFiltering,
 
         anisotropy: bool,
     ) -> VESampler {
+        let sampler_address_mode = get_sampler_address_mode(sampler_address_mode);
+        let min_filter = get_filtering(min_filter);
+        let mag_filter = get_filtering(mag_filter);
+
         let create_info = vk::SamplerCreateInfo::default()
             .min_filter(min_filter)
             .mag_filter(mag_filter)

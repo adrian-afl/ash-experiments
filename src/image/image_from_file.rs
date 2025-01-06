@@ -1,10 +1,12 @@
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::image::image::VEImage;
+use crate::core::memory_properties::VEMemoryProperties;
+use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image_format::VEImageFormat;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
-use image::{ColorType, EncodableLayout, ImageReader};
+use image::{EncodableLayout, ImageReader};
 use std::sync::{Arc, Mutex};
 
 impl VEImage {
@@ -14,7 +16,7 @@ impl VEImage {
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,
-        usage: vk::ImageUsageFlags,
+        usages: &[VEImageUsage],
     ) -> VEImage {
         let img = ImageReader::open(path).unwrap().decode().unwrap();
         let img = img.to_rgba8(); // error handling... TODO
@@ -31,7 +33,7 @@ impl VEImage {
                                   //     ColorType::Rgba32F => vk::Format::R32G32B32A32_SFLOAT,
                                   //     _ => panic!("Unknown format"),
                                   // };
-        let format = vk::Format::R8G8B8A8_UNORM;
+        let format = VEImageFormat::RGBA8unorm;
         VEImage::from_data(
             device,
             queue,
@@ -42,9 +44,8 @@ impl VEImage {
             img.height(),
             1,
             format,
-            vk::ImageTiling::OPTIMAL,
-            usage,
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            usages,
+            Some(VEMemoryProperties::DeviceLocal),
         )
     }
 }

@@ -12,7 +12,6 @@ impl VEImage {
         device: Arc<VEDevice>,
         queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
-        memory_manager: Arc<Mutex<VEMemoryManager>>,
 
         width: u32,
         height: u32,
@@ -24,7 +23,6 @@ impl VEImage {
             device,
             queue,
             command_pool,
-            memory_manager,
 
             allocation: None,
 
@@ -33,9 +31,7 @@ impl VEImage {
             depth: 1,
 
             format,
-            tiling: vk::ImageTiling::OPTIMAL,
 
-            usage: vk::ImageUsageFlags::TRANSFER_DST,
             aspect: vk::ImageAspectFlags::COLOR,
 
             handle: image_handle,

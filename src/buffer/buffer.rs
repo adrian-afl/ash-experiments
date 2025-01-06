@@ -1,4 +1,5 @@
 use crate::core::device::VEDevice;
+use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
 use crate::memory::memory_chunk::VESingleAllocation;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
@@ -28,8 +29,8 @@ impl VEBuffer {
         device: Arc<VEDevice>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         typ: VEBufferType,
-        size: DeviceSize,
-        memory_properties: MemoryPropertyFlags,
+        size: u64,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEBuffer {
         let usage = match typ {
             VEBufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
@@ -51,7 +52,10 @@ impl VEBuffer {
                 .unwrap();
 
             let mem_reqs = device.device.get_buffer_memory_requirements(buffer);
-            let mem_index = device.find_memory_type(mem_reqs.memory_type_bits, memory_properties);
+            let mem_index = device.find_memory_type(
+                mem_reqs.memory_type_bits,
+                get_memory_properties_flags(memory_properties),
+            );
 
             let allocation = {
                 memory_manager

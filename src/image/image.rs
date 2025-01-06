@@ -17,21 +17,28 @@ mod image_from_full;
 #[path = "./image_from_swapchain.rs"]
 mod image_from_swapchain;
 
+#[derive(Debug, Clone)]
+pub enum VEImageUsage {
+    ColorAttachment,
+    DepthAttachment,
+    Sampled,
+    Storage,
+    TransferDestination,
+    TransferSource,
+}
+
 #[derive(Clone)]
 pub struct VEImage {
     device: Arc<VEDevice>,
     queue: Arc<VEMainDeviceQueue>,
     command_pool: Arc<VECommandPool>,
-    memory_manager: Arc<Mutex<VEMemoryManager>>,
 
     pub width: u32,
     pub height: u32,
     pub depth: u32,
 
     pub format: vk::Format,
-    tiling: vk::ImageTiling,
 
-    usage: vk::ImageUsageFlags,
     aspect: vk::ImageAspectFlags,
 
     pub current_layout: vk::ImageLayout,

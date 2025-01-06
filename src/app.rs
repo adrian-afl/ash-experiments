@@ -1,56 +1,110 @@
 use crate::buffer::buffer::{VEBuffer, VEBufferType};
 use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::{
-    VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
+    VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
+    VEDescriptorSetLayoutField,
 };
 use crate::core::helpers::{make_clear_color_f32, make_clear_depth};
+use crate::core::memory_properties::VEMemoryProperties;
 use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::VEShaderModuleType;
 use crate::core::toolkit::{App, VEToolkit};
 use crate::graphics::attachment::VEAttachment;
-use crate::graphics::render_stage::{CullMode, VERenderStage};
+use crate::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERenderStage};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
 use crate::graphics::vertex_buffer::VEVertexBuffer;
-use crate::image::image::VEImage;
-use crate::image::sampler::VESampler;
-use ash::vk;
+use crate::image::filtering::VEFiltering;
+use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image_format::VEImageFormat;
+use crate::image::sampler::{VESampler, VESamplerAddressMode};
 use std::sync::Arc;
 
 pub struct MyApp {
-    texture: VEImage,
-    sampler: VESampler,
-    vertex_buffer: VEVertexBuffer,
-    uniform_buffer: VEBuffer,
-    descriptor_set: VEDescriptorSet,
-    render_stage: Arc<VERenderStage>,
-    render_done_semaphore: VESemaphore,
     scheduler: VEScheduler,
+    elapsed: f32,
+
+    mesh_stage: MeshStage,
+
+    meshes: Vec<Mesh>,
+}
+
+struct MeshStage {
+    uniform_buffer: VEBuffer,
+
     depth_buffer: VEImage,
     color_buffer: Arc<VEImage>,
-    elapsed: f32,
+
+    mesh_descriptor_set_layout: VEDescriptorSetLayout,
+    global_descriptor_set_layout: VEDescriptorSetLayout,
+    global_descriptor_set: VEDescriptorSet,
+
+    vertex_attributes: Vec<VertexAttribFormat>,
+    render_stage: Arc<VERenderStage>,
+}
+
+struct Mesh {
+    vertex_buffer: VEVertexBuffer,
+    texture: VEImage,
+    sampler: VESampler,
+
+    descriptor_set: VEDescriptorSet,
 }
 
 impl MyApp {
     pub fn new(toolkit: &VEToolkit) -> MyApp {
+        let mesh_stage = Self::make_mesh_stage(toolkit);
+
+        let mut scheduler = toolkit.make_scheduler(2);
+
+        let render_item = scheduler.make_render_item(mesh_stage.render_stage.clone());
+        let blit_item = scheduler.make_blit_item(mesh_stage.color_buffer.clone());
+
+        scheduler.set_layer(0, vec![render_item]);
+        scheduler.set_layer(1, vec![blit_item]);
+
+        let mut app = MyApp {
+            mesh_stage,
+            meshes: vec![],
+
+            scheduler,
+            elapsed: 0.0,
+        };
+
+        let dingus = app.make_mesh(toolkit, "dingus.jpg", "dingus.raw");
+
+        app.meshes.push(dingus);
+
+        app
+    }
+
+    fn make_mesh_stage(toolkit: &VEToolkit) -> MeshStage {
         let vertex_shader = toolkit.make_shader_module("vertex.spv", VEShaderModuleType::Vertex);
         let fragment_shader =
             toolkit.make_shader_module("fragment.spv", VEShaderModuleType::Fragment);
 
-        let mut descriptor_set_layout = toolkit.make_descriptor_set_layout(&[
-            VEDescriptorSetLayoutField {
+        let mut global_descriptor_set_layout =
+            toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+                binding: 0,
+                typ: VEDescriptorSetFieldType::UniformBuffer,
+                stage: VEDescriptorSetFieldStage::AllGraphics,
+            }]);
+
+        let mut mesh_descriptor_set_layout =
+            toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::Sampler,
                 stage: VEDescriptorSetFieldStage::Fragment,
-            },
-            VEDescriptorSetLayoutField {
-                binding: 1,
-                typ: VEDescriptorSetFieldType::UniformBuffer,
-                stage: VEDescriptorSetFieldStage::AllGraphics,
-            },
-        ]);
+            }]);
 
-        let descriptor_set = descriptor_set_layout.create_descriptor_set();
+        let global_descriptor_set = global_descriptor_set_layout.create_descriptor_set();
+
+        let uniform_buffer = toolkit.make_buffer(
+            VEBufferType::Uniform,
+            128,
+            Some(VEMemoryProperties::HostCoherent),
+        );
+        global_descriptor_set.bind_buffer(0, &uniform_buffer);
 
         let width = 640;
         let height = 480;
@@ -59,10 +113,9 @@ impl MyApp {
             width,
             height,
             1,
-            vk::Format::R32G32B32A32_SFLOAT,
-            vk::ImageTiling::OPTIMAL,
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-            vk::MemoryPropertyFlags::empty(),
+            VEImageFormat::RGBA32f,
+            &[VEImageUsage::ColorAttachment, VEImageUsage::TransferSource],
+            None,
         ));
 
         let color_attachment = VEAttachment::from_image(
@@ -76,10 +129,9 @@ impl MyApp {
             width,
             height,
             1,
-            vk::Format::D32_SFLOAT,
-            vk::ImageTiling::OPTIMAL,
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-            vk::MemoryPropertyFlags::empty(),
+            VEImageFormat::Depth32f,
+            &[VEImageUsage::DepthAttachment],
+            None,
         );
 
         let depth_attachment =
@@ -96,77 +148,85 @@ impl MyApp {
             width,
             height,
             &[&color_attachment, &depth_attachment],
-            &[&descriptor_set_layout],
+            &[&global_descriptor_set_layout, &mesh_descriptor_set_layout],
             &vertex_shader,
             &fragment_shader,
             &vertex_attributes,
-            vk::PrimitiveTopology::TRIANGLE_LIST,
-            CullMode::None,
+            VEPrimitiveTopology::TriangleList,
+            VECullMode::None,
         ));
 
-        let vertex_buffer = toolkit.make_vertex_buffer_from_file("dingus.raw", &vertex_attributes);
+        MeshStage {
+            uniform_buffer,
+            depth_buffer,
+            color_buffer,
 
-        let texture =
-            toolkit.make_image_from_file("test-normal-map.jpg", vk::ImageUsageFlags::SAMPLED);
+            vertex_attributes: vertex_attributes.to_vec(),
+
+            mesh_descriptor_set_layout,
+
+            global_descriptor_set_layout,
+            global_descriptor_set,
+
+            render_stage,
+        }
+    }
+
+    pub fn make_mesh(&mut self, toolkit: &VEToolkit, texture: &str, model: &str) -> Mesh {
+        let descriptor_set = self
+            .mesh_stage
+            .mesh_descriptor_set_layout
+            .create_descriptor_set();
+
+        let vertex_buffer =
+            toolkit.make_vertex_buffer_from_file(model, &self.mesh_stage.vertex_attributes);
+
+        let texture = toolkit.make_image_from_file(texture, &[VEImageUsage::Sampled]);
 
         let sampler = toolkit.make_sampler(
-            vk::SamplerAddressMode::REPEAT,
-            vk::Filter::LINEAR,
-            vk::Filter::LINEAR,
+            VESamplerAddressMode::Repeat,
+            VEFiltering::Linear,
+            VEFiltering::Linear,
             false,
         );
 
         descriptor_set.bind_image_sampler(0, &texture, &sampler);
 
-        let mut scheduler = toolkit.make_scheduler(2);
-
-        let render_item = scheduler.make_render_item(render_stage.clone());
-        let blit_item = scheduler.make_blit_item(color_buffer.clone());
-
-        scheduler.set_layer(0, vec![render_item]);
-        scheduler.set_layer(1, vec![blit_item]);
-
-        let uniform_buffer = toolkit.make_buffer(
-            VEBufferType::Uniform,
-            128,
-            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-        );
-        descriptor_set.bind_buffer(1, &uniform_buffer);
-
-        MyApp {
-            render_done_semaphore: toolkit.make_semaphore(),
-            render_stage: render_stage,
+        Mesh {
             vertex_buffer,
-            descriptor_set,
             texture,
             sampler,
-            scheduler,
-            uniform_buffer,
-            depth_buffer,
-            color_buffer,
-            elapsed: 0.0,
+
+            descriptor_set,
         }
     }
 }
 
 impl App for MyApp {
     fn draw(&mut self, toolkit: &VEToolkit) {
-        let pointer = self.uniform_buffer.map() as *mut f32;
-
+        let pointer = self.mesh_stage.uniform_buffer.map() as *mut f32;
         unsafe {
             pointer.write(self.elapsed);
         }
+        self.mesh_stage.uniform_buffer.unmap();
 
-        self.uniform_buffer.unmap();
+        self.mesh_stage.render_stage.begin_recording();
 
-        self.render_stage.begin_recording();
+        self.mesh_stage
+            .render_stage
+            .set_descriptor_set(0, &self.mesh_stage.global_descriptor_set);
 
-        self.render_stage
-            .set_descriptor_set(0, &self.descriptor_set);
+        for mesh in &self.meshes {
+            self.mesh_stage
+                .render_stage
+                .set_descriptor_set(1, &mesh.descriptor_set);
 
-        self.render_stage.draw_instanced(&self.vertex_buffer, 1);
+            self.mesh_stage
+                .render_stage
+                .draw_instanced(&mesh.vertex_buffer, 1);
+        }
 
-        self.render_stage.end_recording();
+        self.mesh_stage.render_stage.end_recording();
 
         self.scheduler.run();
 

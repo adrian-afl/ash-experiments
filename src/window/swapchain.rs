@@ -163,7 +163,6 @@ impl VESwapchain {
                 device.clone(),
                 main_device_queue.clone(),
                 command_pool.clone(),
-                memory_manager.clone(),
                 surface_resolution.width,
                 surface_resolution.height,
                 surface_format.format,

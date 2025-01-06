@@ -1,11 +1,30 @@
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
 use crate::image::aspect_from_format::aspect_from_format;
-use crate::image::image::VEImage;
+use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image_format::{get_image_format, VEImageFormat};
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use std::sync::{Arc, Mutex};
+
+fn get_image_usage_flags(usages: &[VEImageUsage]) -> vk::ImageUsageFlags {
+    let mut flags = vk::ImageUsageFlags::empty();
+    for usage in usages {
+        match usage {
+            VEImageUsage::ColorAttachment => flags = flags | vk::ImageUsageFlags::COLOR_ATTACHMENT,
+            VEImageUsage::DepthAttachment => {
+                flags = flags | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+            }
+            VEImageUsage::Sampled => flags = flags | vk::ImageUsageFlags::SAMPLED,
+            VEImageUsage::Storage => flags = flags | vk::ImageUsageFlags::STORAGE,
+            VEImageUsage::TransferDestination => flags = flags | vk::ImageUsageFlags::TRANSFER_DST,
+            VEImageUsage::TransferSource => flags = flags | vk::ImageUsageFlags::TRANSFER_SRC,
+        }
+    }
+    flags
+}
 
 impl VEImage {
     pub fn from_full(
@@ -18,13 +37,13 @@ impl VEImage {
         height: u32,
         depth: u32,
 
-        format: vk::Format,
-        tiling: vk::ImageTiling,
+        format: VEImageFormat,
 
-        usage: vk::ImageUsageFlags,
+        usages: &[VEImageUsage],
 
-        memory_properties: vk::MemoryPropertyFlags,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEImage {
+        let format = get_image_format(format);
         let aspect = aspect_from_format(format);
 
         let queue_family_indices = [device.queue_family_index];
@@ -44,8 +63,8 @@ impl VEImage {
             .mip_levels(1)
             .array_layers(1)
             .format(format)
-            .tiling(tiling)
-            .usage(usage)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(get_image_usage_flags(usages))
             .samples(vk::SampleCountFlags::TYPE_1)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .queue_family_indices(&queue_family_indices)
@@ -59,7 +78,10 @@ impl VEImage {
         };
 
         let mem_reqs = unsafe { device.device.get_image_memory_requirements(image_handle) };
-        let mem_index = device.find_memory_type(mem_reqs.memory_type_bits, memory_properties);
+        let mem_index = device.find_memory_type(
+            mem_reqs.memory_type_bits,
+            get_memory_properties_flags(memory_properties),
+        );
 
         let allocation = {
             memory_manager
@@ -101,7 +123,6 @@ impl VEImage {
             device,
             queue,
             command_pool,
-            memory_manager,
 
             allocation: Some(allocation),
 
@@ -110,9 +131,7 @@ impl VEImage {
             depth,
 
             format,
-            tiling,
 
-            usage,
             aspect,
 
             handle: image_handle,

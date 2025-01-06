@@ -3,7 +3,9 @@ use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::image::image::VEImage;
+use crate::core::memory_properties::VEMemoryProperties;
+use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image_format::VEImageFormat;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
@@ -22,14 +24,14 @@ impl VEImage {
         height: u32,
         depth: u32,
 
-        format: vk::Format,
-        tiling: vk::ImageTiling,
+        format: VEImageFormat,
 
-        usage: vk::ImageUsageFlags,
+        usages: &[VEImageUsage],
 
-        memory_properties: vk::MemoryPropertyFlags,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEImage {
-        println!("format is {:?}", format);
+        let mut usages = usages.to_vec();
+        usages.push(VEImageUsage::TransferDestination);
         let mut empty = VEImage::from_full(
             device.clone(),
             queue.clone(),
@@ -39,8 +41,7 @@ impl VEImage {
             height,
             depth,
             format,
-            tiling,
-            usage | vk::ImageUsageFlags::TRANSFER_DST,
+            usages.as_slice(),
             memory_properties,
         );
 
@@ -49,7 +50,7 @@ impl VEImage {
             memory_manager.clone(),
             VEBufferType::TransferSource,
             data.len() as vk::DeviceSize,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            Some(VEMemoryProperties::HostCoherent),
         );
 
         unsafe {

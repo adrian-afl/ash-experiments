@@ -5,15 +5,18 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::descriptor_set_layout::{VEDescriptorSetLayout, VEDescriptorSetLayoutField};
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::memory_properties::VEMemoryProperties;
 use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::{VEShaderModule, VEShaderModuleType};
 use crate::graphics::attachment::VEAttachment;
-use crate::graphics::render_stage::{CullMode, VERenderStage};
+use crate::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERenderStage};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
 use crate::graphics::vertex_buffer::VEVertexBuffer;
-use crate::image::image::VEImage;
-use crate::image::sampler::VESampler;
+use crate::image::filtering::VEFiltering;
+use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image_format::VEImageFormat;
+use crate::image::sampler::{VESampler, VESamplerAddressMode};
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::VESwapchain;
 use crate::window::window::{AppCallback, VEWindow};
@@ -135,12 +138,11 @@ impl VEToolkit {
         height: u32,
         depth: u32,
 
-        format: vk::Format,
-        tiling: vk::ImageTiling,
+        format: VEImageFormat,
 
-        usage: vk::ImageUsageFlags,
+        usages: &[VEImageUsage],
 
-        memory_properties: vk::MemoryPropertyFlags,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEImage {
         VEImage::from_full(
             self.device.clone(),
@@ -151,8 +153,7 @@ impl VEToolkit {
             height,
             depth,
             format,
-            tiling,
-            usage,
+            usages,
             memory_properties,
         )
     }
@@ -165,12 +166,11 @@ impl VEToolkit {
         height: u32,
         depth: u32,
 
-        format: vk::Format,
-        tiling: vk::ImageTiling,
+        format: VEImageFormat,
 
-        usage: vk::ImageUsageFlags,
+        usages: &[VEImageUsage],
 
-        memory_properties: vk::MemoryPropertyFlags,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEImage {
         VEImage::from_data(
             self.device.clone(),
@@ -182,29 +182,28 @@ impl VEToolkit {
             height,
             depth,
             format,
-            tiling,
-            usage,
+            usages,
             memory_properties,
         )
     }
 
-    pub fn make_image_from_file(&self, path: &str, usage: vk::ImageUsageFlags) -> VEImage {
+    pub fn make_image_from_file(&self, path: &str, usages: &[VEImageUsage]) -> VEImage {
         VEImage::from_file(
             self.device.clone(),
             self.queue.clone(),
             self.command_pool.clone(),
             self.memory_manager.clone(),
             path,
-            usage,
+            usages,
         )
     }
 
     pub fn make_sampler(
         &self,
-        sampler_address_mode: vk::SamplerAddressMode,
+        sampler_address_mode: VESamplerAddressMode,
 
-        min_filter: vk::Filter,
-        mag_filter: vk::Filter,
+        min_filter: VEFiltering,
+        mag_filter: VEFiltering,
 
         anisotropy: bool,
     ) -> VESampler {
@@ -225,7 +224,7 @@ impl VEToolkit {
         &self,
         typ: VEBufferType,
         size: vk::DeviceSize,
-        memory_properties: vk::MemoryPropertyFlags,
+        memory_properties: Option<VEMemoryProperties>,
     ) -> VEBuffer {
         VEBuffer::new(
             self.device.clone(),
@@ -275,8 +274,8 @@ impl VEToolkit {
         vertex_shader: &VEShaderModule,
         fragment_shader: &VEShaderModule,
         vertex_attributes: &[VertexAttribFormat],
-        primitive_topology: vk::PrimitiveTopology,
-        cull_mode: CullMode,
+        primitive_topology: VEPrimitiveTopology,
+        cull_mode: VECullMode,
     ) -> VERenderStage {
         VERenderStage::new(
             self.device.clone(),

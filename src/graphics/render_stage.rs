@@ -27,10 +27,39 @@ pub struct VERenderStage {
 }
 
 #[derive(Clone)]
-pub enum CullMode {
+pub enum VECullMode {
     None,
     Front,
     Back,
+}
+
+#[derive(Clone)]
+pub enum VEPrimitiveTopology {
+    Points,
+    LineList,
+    LineStrip,
+    TriangleList,
+    TriangleStrip,
+    TriangleFan,
+}
+
+fn get_primitive_topology(topo: VEPrimitiveTopology) -> vk::PrimitiveTopology {
+    match topo {
+        VEPrimitiveTopology::Points => vk::PrimitiveTopology::POINT_LIST,
+        VEPrimitiveTopology::LineList => vk::PrimitiveTopology::LINE_LIST,
+        VEPrimitiveTopology::LineStrip => vk::PrimitiveTopology::LINE_STRIP,
+        VEPrimitiveTopology::TriangleList => vk::PrimitiveTopology::TRIANGLE_LIST,
+        VEPrimitiveTopology::TriangleStrip => vk::PrimitiveTopology::TRIANGLE_STRIP,
+        VEPrimitiveTopology::TriangleFan => vk::PrimitiveTopology::TRIANGLE_FAN,
+    }
+}
+
+fn get_cull_flags(mode: VECullMode) -> vk::CullModeFlags {
+    match mode {
+        VECullMode::None => vk::CullModeFlags::NONE,
+        VECullMode::Front => vk::CullModeFlags::FRONT,
+        VECullMode::Back => vk::CullModeFlags::BACK,
+    }
 }
 
 impl VERenderStage {
@@ -44,19 +73,12 @@ impl VERenderStage {
         vertex_shader: &VEShaderModule,
         fragment_shader: &VEShaderModule,
         vertex_attributes: &[VertexAttribFormat],
-        primitive_topology: vk::PrimitiveTopology,
-        cull_mode: CullMode,
+        primitive_topology: VEPrimitiveTopology,
+        cull_mode: VECullMode,
     ) -> VERenderStage {
-        let cull_flags = match cull_mode {
-            CullMode::None => vk::CullModeFlags::NONE,
-            CullMode::Front => vk::CullModeFlags::FRONT,
-            CullMode::Back => vk::CullModeFlags::BACK,
-        };
-
         let render_pass = VERenderPass::new(device.clone(), attachments);
 
         let framebuffer = VEFrameBuffer::new(
-            // for what is this used? is this needed?? TODO
             device.clone(),
             viewport_width,
             viewport_height,
@@ -74,8 +96,8 @@ impl VERenderStage {
             &render_pass,
             attachments,
             vertex_attributes,
-            primitive_topology,
-            cull_flags,
+            get_primitive_topology(primitive_topology),
+            get_cull_flags(cull_mode),
         );
 
         let clear_values = attachments

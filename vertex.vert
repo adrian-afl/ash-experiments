@@ -13,7 +13,7 @@ layout(location = 3) in vec4 inTangent;
 layout(location = 0) out vec3 outNormal;
 layout(location = 1) out vec2 outTexCoord;
 
-layout(set = 0, binding = 1) uniform ubo { float Time; } buff;
+layout(set = 0, binding = 0) uniform ubo { float Time; } buff;
 
 mat3 rotationMatrix(vec3 axis, float angle)
 {
@@ -32,7 +32,7 @@ mat3 rotationMatrix(vec3 axis, float angle)
 void main() {
     mat3 rotmat = rotationMatrix(vec3(0, 1, 0), buff.Time);
     vec3 pos = rotmat * inPosition.xyz;
-    pos.z *= 1.0;
+    pos.z *= -1.0;
     gl_Position = vec4(pos.xyz * 0.5, 1.0);
     outTexCoord = inTexCoord;
     outNormal = inNormal;

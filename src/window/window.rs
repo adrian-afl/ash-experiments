@@ -5,7 +5,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 
@@ -60,6 +60,15 @@ impl ApplicationHandler for VEWindow {
             }
             _ => (),
         }
+    }
+
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        println!("{:?}, {:?}", device_id, event);
     }
 }
 

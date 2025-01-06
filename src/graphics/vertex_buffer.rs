@@ -1,6 +1,7 @@
 use crate::buffer::buffer::{VEBuffer, VEBufferType};
 use crate::core::command_buffer::VECommandBuffer;
 use crate::core::device::VEDevice;
+use crate::core::memory_properties::VEMemoryProperties;
 use crate::graphics::vertex_attributes::{get_vertex_attribute_type_byte_size, VertexAttribFormat};
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
@@ -49,7 +50,7 @@ impl VEVertexBuffer {
             memory_manager.clone(),
             VEBufferType::Vertex,
             file_size as vk::DeviceSize,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            Some(VEMemoryProperties::HostCoherent),
         );
 
         unsafe {
