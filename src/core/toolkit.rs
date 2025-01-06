@@ -246,7 +246,12 @@ impl VEToolkit {
         set_layouts: &[&VEDescriptorSetLayout],
         shader: &VEShaderModule,
     ) -> VEComputeStage {
-        VEComputeStage::new(self.device.clone(), set_layouts, shader)
+        VEComputeStage::new(
+            self.device.clone(),
+            self.command_pool.clone(),
+            set_layouts,
+            shader,
+        )
     }
 
     pub fn make_render_stage(
@@ -263,6 +268,7 @@ impl VEToolkit {
     ) -> VERenderStage {
         VERenderStage::new(
             self.device.clone(),
+            self.command_pool.clone(),
             viewport_width,
             viewport_height,
             attachments,

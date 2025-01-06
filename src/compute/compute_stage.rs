@@ -7,10 +7,12 @@ use crate::core::shader_module::VEShaderModule;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
 use std::sync::Arc;
+use crate::core::command_pool::VECommandPool;
 
 pub struct VEComputeStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEComputePipeline>,
+    pub command_buffer: VECommandBuffer,
     sets: Vec<Arc<VEDescriptorSet>>,
 }
 
@@ -19,13 +21,15 @@ static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
 impl VEComputeStage {
     pub fn new(
         device: Arc<VEDevice>,
+        command_pool: Arc<VECommandPool>,
         set_layouts: &[&VEDescriptorSetLayout],
         shader: &VEShaderModule,
     ) -> VEComputeStage {
         let pipeline = VEComputePipeline::new(device.clone(), set_layouts, &shader);
         VEComputeStage {
-            device,
+            device: device.clone(),
             pipeline: Arc::new(pipeline),
+            command_buffer: VECommandBuffer::new(device, command_pool.clone()),
             sets: vec![],
         }
     }
@@ -57,19 +61,19 @@ impl VEComputeStage {
         }
     }
 
-    pub fn begin_recording(&self, command_buffer: &VECommandBuffer) {
-        command_buffer.begin(CommandBufferUsageFlags::empty());
+    pub fn begin_recording(&self) {
+        self.command_buffer.begin(CommandBufferUsageFlags::empty());
         unsafe {
             self.device.device.cmd_bind_pipeline(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.pipeline,
             );
         }
     }
 
-    pub fn end_recording(&self, command_buffer: &VECommandBuffer) {
-        command_buffer.end();
+    pub fn end_recording(&self) {
+        self.command_buffer.end();
     }
 
     pub fn dispatch(

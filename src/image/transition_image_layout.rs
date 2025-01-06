@@ -102,7 +102,7 @@ pub fn transition_image_layout(
 
     command_buffer.end();
 
-    command_buffer.submit(&queue, &mut [], &mut []);
+    command_buffer.submit(&queue, vec![], vec![]);
     queue.wait_idle();
 }
 

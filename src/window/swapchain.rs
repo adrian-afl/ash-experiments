@@ -13,6 +13,7 @@ use ash::vk::{
     SurfaceFormatKHR, SwapchainKHR,
 };
 use std::fmt::{Debug, Formatter};
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tracing::{event, instrument, Level};
 
@@ -42,8 +43,8 @@ pub struct VESwapchain {
     pub width: u32,
     pub height: u32,
 
-    acquire_ready_semaphore: VESemaphore,
-    pub blit_done_semaphore: VESemaphore,
+    acquire_ready_semaphore: Arc<Mutex<VESemaphore>>,
+    pub blit_done_semaphore: Arc<Mutex<VESemaphore>>,
     present_command_buffer: VECommandBuffer,
 }
 
@@ -157,26 +158,29 @@ impl VESwapchain {
             width: surface_resolution.width,
             height: surface_resolution.height,
 
-            acquire_ready_semaphore: VESemaphore::new(device.clone()),
-            blit_done_semaphore: VESemaphore::new(device.clone()),
+            acquire_ready_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
+            blit_done_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
             present_command_buffer: VECommandBuffer::new(device.clone(), command_pool),
         }
     }
 
     #[instrument]
-    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: &mut [&mut VESemaphore]) {
-        self.acquire_ready_semaphore.state = SemaphoreState::Pending;
-        event!(Level::TRACE, "Setting semaphore acquire_ready_semaphore to Pending");
-        let acquired = self.acquire_next_image(self.acquire_ready_semaphore.handle);
+    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>) {
+        self.acquire_ready_semaphore.lock().unwrap().state = SemaphoreState::Pending;
+        event!(
+            Level::TRACE,
+            "Setting semaphore acquire_ready_semaphore to Pending"
+        );
+        let ack_semaphore = self.acquire_ready_semaphore.clone();
+        let acquired = self.acquire_next_image(ack_semaphore.lock().unwrap().handle);
 
-        let ack_semaphore = &mut self.acquire_ready_semaphore;
-        let blit_semaphore = &mut self.blit_done_semaphore;
-        let mut wait_handles: Vec<&mut VESemaphore> = vec![];
-        for item in wait_for_semaphores.iter_mut(){
-            wait_handles.push(item);
+        let blit_semaphore = &self.blit_done_semaphore;
+        let mut wait_handles: Vec<Arc<Mutex<VESemaphore>>> = vec![];
+        for item in wait_for_semaphores.iter() {
+            wait_handles.push(item.clone());
         }
 
-        wait_handles.push(ack_semaphore);
+        wait_handles.push(ack_semaphore.clone());
 
         self.present_images[acquired as usize]
             .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL);
@@ -227,8 +231,8 @@ impl VESwapchain {
         self.present_command_buffer.end();
         self.present_command_buffer.submit(
             &self.main_device_queue,
-            wait_handles.as_mut_slice(),
-            &mut [blit_semaphore],
+            wait_handles,
+            vec![blit_semaphore.clone()],
         );
 
         self.present_images[acquired as usize]

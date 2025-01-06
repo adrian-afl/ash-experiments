@@ -1,4 +1,5 @@
 use crate::core::command_buffer::VECommandBuffer;
+use crate::core::command_pool::VECommandPool;
 use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
 use crate::core::device::VEDevice;
@@ -8,6 +9,7 @@ use crate::graphics::framebuffer::VEFrameBuffer;
 use crate::graphics::graphics_pipeline::VEGraphicsPipeline;
 use crate::graphics::renderpass::VERenderPass;
 use crate::graphics::vertex_attributes::VertexAttribFormat;
+use crate::graphics::vertex_buffer::VEVertexBuffer;
 use ash::vk;
 use std::sync::Arc;
 
@@ -16,6 +18,7 @@ static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::GRAPHICS;
 pub struct VERenderStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEGraphicsPipeline>,
+    pub command_buffer: VECommandBuffer,
     render_pass: VERenderPass,
     framebuffer: VEFrameBuffer,
     viewport_width: u32,
@@ -33,6 +36,7 @@ pub enum CullMode {
 impl VERenderStage {
     pub fn new(
         device: Arc<VEDevice>,
+        command_pool: Arc<VECommandPool>,
         viewport_width: u32,
         viewport_height: u32,
         attachments: &[&VEAttachment],
@@ -83,8 +87,9 @@ impl VERenderStage {
             .collect();
 
         VERenderStage {
-            device,
+            device: device.clone(),
             pipeline: Arc::new(pipeline),
+            command_buffer: VECommandBuffer::new(device, command_pool.clone()),
             render_pass,
             framebuffer,
             viewport_width,
@@ -93,15 +98,10 @@ impl VERenderStage {
         }
     }
 
-    pub fn set_descriptor_set(
-        &mut self,
-        command_buffer: &VECommandBuffer,
-        index: u32,
-        set: &VEDescriptorSet,
-    ) {
+    pub fn set_descriptor_set(&self, index: u32, set: &VEDescriptorSet) {
         unsafe {
             self.device.device.cmd_bind_descriptor_sets(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.layout,
                 index,
@@ -111,8 +111,9 @@ impl VERenderStage {
         }
     }
 
-    pub fn begin_recording(&self, command_buffer: &VECommandBuffer) {
-        command_buffer.begin(vk::CommandBufferUsageFlags::empty());
+    pub fn begin_recording(&self) {
+        self.command_buffer
+            .begin(vk::CommandBufferUsageFlags::empty());
 
         let rect = vk::Rect2D::default()
             .offset(vk::Offset2D::default())
@@ -130,25 +131,43 @@ impl VERenderStage {
 
         unsafe {
             self.device.device.cmd_begin_render_pass(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 &render_pass_begin_info,
                 vk::SubpassContents::INLINE,
             );
 
             self.device.device.cmd_bind_pipeline(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.pipeline,
             );
         }
     }
 
-    pub fn end_recording(&self, command_buffer: &VECommandBuffer) {
+    pub fn end_recording(&self) {
         unsafe {
             self.device
                 .device
-                .cmd_end_render_pass(command_buffer.handle);
+                .cmd_end_render_pass(self.command_buffer.handle);
         }
-        command_buffer.end();
+        self.command_buffer.end();
+    }
+
+    pub fn draw_instanced(&self, vertex_buffer: &VEVertexBuffer, instances: u32) {
+        unsafe {
+            self.device.device.cmd_bind_vertex_buffers(
+                self.command_buffer.handle,
+                0,
+                &[vertex_buffer.buffer.buffer],
+                &[0],
+            );
+            self.device.device.cmd_draw(
+                self.command_buffer.handle,
+                vertex_buffer.vertex_count,
+                instances,
+                0,
+                0,
+            );
+        }
     }
 }

@@ -7,7 +7,7 @@ use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandBufferUsageFlags,
     PipelineStageFlags,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::{event, Level};
 
 pub struct VECommandBuffer {
@@ -56,28 +56,35 @@ impl<'a> VECommandBuffer {
     pub fn submit(
         &self,
         queue: &VEMainDeviceQueue,
-        wait_for_semaphores: &mut [&mut VESemaphore],
-        signal_semaphores: &mut [&mut VESemaphore],
+        wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
+        signal_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
     ) {
-        let wait_handles: Vec<vk::Semaphore> =
-            wait_for_semaphores.iter().filter(|x| {
+        let wait_handles: Vec<vk::Semaphore> = wait_for_semaphores
+            .iter()
+            .filter(|x| {
+                let x = x.lock().unwrap();
                 match x.state {
                     SemaphoreState::Fresh => false,
                     SemaphoreState::Pending => true,
-                    SemaphoreState::Awaited => panic!("Waiting for awaited semaphore")
+                    SemaphoreState::Awaited => panic!("Waiting for awaited semaphore"),
                 }
-            }).map(|mut x| {
+            })
+            .map(|mut x| {
+                let x = x.lock().unwrap();
                 x.handle
-            }).collect();
+            })
+            .collect();
 
         let wait_masks: Vec<PipelineStageFlags> = wait_for_semaphores
-            .iter().filter(|x| {
-            match x.state {
-                SemaphoreState::Fresh => false,
-                SemaphoreState::Pending => true,
-                SemaphoreState::Awaited => panic!("Waiting for awaited semaphore")
-            }
-        })
+            .iter()
+            .filter(|x| {
+                let x = x.lock().unwrap();
+                match x.state {
+                    SemaphoreState::Fresh => false,
+                    SemaphoreState::Pending => true,
+                    SemaphoreState::Awaited => panic!("Waiting for awaited semaphore"),
+                }
+            })
             .map(|_| {
                 PipelineStageFlags::ALL_COMMANDS
                     | PipelineStageFlags::ALL_GRAPHICS
@@ -85,25 +92,34 @@ impl<'a> VECommandBuffer {
             })
             .collect();
 
-        for semaphore in wait_for_semaphores.iter_mut() {
-            if (*semaphore).state == SemaphoreState::Pending {
+        for semaphore in wait_for_semaphores.iter() {
+            let mut semaphore = semaphore.lock().unwrap();
+            if (semaphore).state == SemaphoreState::Pending {
                 event!(Level::TRACE, "Setting semaphore to Awaited");
-                (*semaphore).state = SemaphoreState::Awaited;
+                (semaphore).state = SemaphoreState::Awaited;
             }
         }
 
-        let signal_handles: Vec<vk::Semaphore> =
-            signal_semaphores.iter().map(|mut x| {
+        let signal_handles: Vec<vk::Semaphore> = signal_semaphores
+            .iter()
+            .map(|mut x| {
+                let x = x.lock().unwrap();
                 x.handle
-            }).collect();
+            })
+            .collect();
 
-        for mut semaphore in signal_semaphores.iter_mut() {
+        for mut semaphore in signal_semaphores.iter() {
+            let mut semaphore = semaphore.lock().unwrap();
             event!(Level::TRACE, "Setting semaphore to Pending");
-            (*semaphore).state = SemaphoreState::Pending;
+            (semaphore).state = SemaphoreState::Pending;
         }
 
         let command_buffer_handles = [self.handle];
 
+        println!(
+            "SUBMIT Wait For {:?}, Signal {:?}",
+            wait_handles, signal_handles
+        );
         let submit_info = vk::SubmitInfo::default()
             .signal_semaphores(&signal_handles)
             .wait_semaphores(&wait_handles)

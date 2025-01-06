@@ -3,6 +3,7 @@ use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
 };
+use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::VESemaphore;
 use crate::core::shader_module::VEShaderModuleType;
 use crate::core::toolkit::{App, VEToolkit};
@@ -21,10 +22,9 @@ pub struct MyApp {
     sampler: VESampler,
     vertex_buffer: VEVertexBuffer,
     descriptor_set: VEDescriptorSet,
-    command_buffer: VECommandBuffer,
-    render_stage: VERenderStage,
+    render_stage: Arc<VERenderStage>,
     render_done_semaphore: VESemaphore,
-    result_image: VEImage,
+    scheduler: VEScheduler,
 }
 
 impl MyApp {
@@ -48,7 +48,7 @@ impl MyApp {
         let width = 640;
         let height = 480;
 
-        let mut color_buffer = toolkit.make_image_full(
+        let mut color_buffer = Arc::from(toolkit.make_image_full(
             width,
             height,
             1,
@@ -56,7 +56,7 @@ impl MyApp {
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
             vk::MemoryPropertyFlags::empty(),
-        );
+        ));
 
         // color_buffer.transition_layout(vk::ImageLayout::PREINITIALIZED, vk::ImageLayout::GENERAL);
 
@@ -100,7 +100,7 @@ impl MyApp {
             VertexAttribFormat::RGBA32f,
         ];
 
-        let render_stage = toolkit.make_render_stage(
+        let render_stage = Arc::new(toolkit.make_render_stage(
             width,
             height,
             &[&color_attachment, &depth_attachment],
@@ -110,7 +110,7 @@ impl MyApp {
             &vertex_attributes,
             vk::PrimitiveTopology::TRIANGLE_LIST,
             CullMode::None,
-        );
+        ));
 
         let vertex_buffer = toolkit.make_vertex_buffer_from_file("dingus.raw", &vertex_attributes);
 
@@ -126,40 +126,37 @@ impl MyApp {
 
         descriptor_set.bind_image_sampler(0, &texture, &sampler);
 
+        let mut scheduler = VEScheduler::new(2);
+
+        let render_item = scheduler.make_render_item(toolkit, "render", render_stage.clone());
+        let blit_item = scheduler.make_blit_item(toolkit, "blit", color_buffer);
+
+        scheduler.set_layer(0, vec![render_item]);
+        scheduler.set_layer(1, vec![blit_item]);
+
         MyApp {
-            result_image: color_buffer,
             render_done_semaphore: toolkit.make_semaphore(),
-            render_stage,
+            render_stage: render_stage,
             vertex_buffer,
-            command_buffer,
             descriptor_set,
             texture,
             sampler,
+            scheduler,
         }
     }
 }
 
 impl App for MyApp {
     fn draw(&mut self, toolkit: &VEToolkit) {
-        self.render_stage.begin_recording(&self.command_buffer);
+        self.render_stage.begin_recording();
 
         self.render_stage
-            .set_descriptor_set(&self.command_buffer, 0, &self.descriptor_set);
+            .set_descriptor_set(0, &self.descriptor_set);
 
-        self.vertex_buffer.draw_instanced(&self.command_buffer, 1);
+        self.render_stage.draw_instanced(&self.vertex_buffer, 1);
 
-        self.render_stage.end_recording(&self.command_buffer);
+        self.render_stage.end_recording();
 
-        let mut swapchain = toolkit.swapchain.lock().unwrap();
-
-        event!(Level::TRACE, "App submit");
-        self.command_buffer.submit(
-            &toolkit.queue,
-            &mut [&mut swapchain.blit_done_semaphore],
-            &mut [&mut self.render_done_semaphore],
-        );
-
-        event!(Level::TRACE, "App blit");
-        swapchain.blit(&self.result_image, &mut [&mut self.render_done_semaphore]);
+        self.scheduler.run(toolkit);
     }
 }
