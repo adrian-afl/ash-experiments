@@ -13,7 +13,6 @@ pub struct VEComputeStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEComputePipeline>,
     pub command_buffer: VECommandBuffer,
-    sets: Vec<Arc<VEDescriptorSet>>,
 }
 
 static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
@@ -30,32 +29,17 @@ impl VEComputeStage {
             device: device.clone(),
             pipeline: Arc::new(pipeline),
             command_buffer: VECommandBuffer::new(device, command_pool.clone()),
-            sets: vec![],
         }
     }
 
-    pub fn set_descriptor_set(
-        &mut self,
-        command_buffer: &VECommandBuffer,
-        index: usize,
-        set: Arc<VEDescriptorSet>,
-    ) {
-        while self.sets.len() <= index {
-            self.sets.push(set.clone()); // TODO weird but can work
-        }
-        self.sets[index] = set;
-        self.bind_descriptor_sets(command_buffer);
-    }
-
-    fn bind_descriptor_sets(&self, command_buffer: &VECommandBuffer) {
-        let handles: Vec<vk::DescriptorSet> = self.sets.iter().map(|x| x.set).collect();
+    pub fn set_descriptor_set(&self, index: u32, set: &VEDescriptorSet) {
         unsafe {
             self.device.device.cmd_bind_descriptor_sets(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.layout,
-                0,
-                &handles,
+                index,
+                &[set.set],
                 &[],
             );
         }
@@ -78,14 +62,13 @@ impl VEComputeStage {
 
     pub fn dispatch(
         &self,
-        command_buffer: &VECommandBuffer,
         group_count_x: u32,
         group_count_y: u32,
         group_count_z: u32,
     ) {
         unsafe {
             self.device.device.cmd_dispatch(
-                command_buffer.handle,
+                self.command_buffer.handle,
                 group_count_x,
                 group_count_y,
                 group_count_z,

@@ -1,0 +1,100 @@
+use std::fs::File;
+use std::process;
+use std::sync::{Arc, Mutex};
+use tracing::Level;
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::FmtSubscriber;
+use vengine_rs::buffer::buffer::VEBufferType;
+use vengine_rs::core::descriptor_set_layout::{
+    VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
+};
+use vengine_rs::core::memory_properties::VEMemoryProperties;
+use vengine_rs::core::shader_module::VEShaderModuleType;
+use vengine_rs::core::toolkit::{App, VEToolkit};
+use winit::dpi::PhysicalSize;
+use winit::window::WindowAttributes;
+
+struct ComputeApp {}
+
+impl ComputeApp {
+    pub fn calculate(toolkit: &&VEToolkit) -> ComputeApp {
+        let mut buffer = toolkit.make_buffer(
+            VEBufferType::Storage,
+            128,
+            Some(VEMemoryProperties::HostCoherent),
+        );
+        let pointer = buffer.map() as *mut f32;
+        unsafe {
+            pointer.offset(0).write(1.0);
+            pointer.offset(1).write(10.0);
+            pointer.offset(2).write(100.0);
+            pointer.offset(3).write(1000.0);
+        }
+        buffer.unmap();
+
+        let mut set_layout = toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+            binding: 0,
+            typ: VEDescriptorSetFieldType::StorageBuffer,
+            stage: VEDescriptorSetFieldStage::Compute,
+        }]);
+
+        let shader =
+            toolkit.make_shader_module("examples/compute/compute.spv", VEShaderModuleType::Compute);
+
+        let compute_stage = toolkit.make_compute_stage(&[&set_layout], &shader);
+
+        let set = set_layout.create_descriptor_set();
+        set.bind_buffer(0, &buffer);
+
+        compute_stage.begin_recording();
+        compute_stage.set_descriptor_set(0, &set);
+        compute_stage.dispatch(4, 1, 1);
+        compute_stage.end_recording();
+        compute_stage
+            .command_buffer
+            .submit(&toolkit.queue, vec![], vec![]);
+
+        toolkit.queue.wait_idle();
+
+        let pointer = buffer.map() as *mut f32;
+        unsafe {
+            println!("{}", pointer.offset(0).read());
+            println!("{}", pointer.offset(1).read());
+            println!("{}", pointer.offset(2).read());
+            println!("{}", pointer.offset(3).read());
+        }
+        buffer.unmap();
+
+        ComputeApp {}
+    }
+}
+
+impl App for ComputeApp {
+    fn draw(&mut self, toolkit: &VEToolkit) {
+        process::exit(0);
+    }
+}
+
+fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_ansi(false)
+        .with_writer(File::create("../log.txt").unwrap())
+        .with_span_events(FmtSpan::FULL)
+        .with_max_level(Level::TRACE)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    let window_attributes = WindowAttributes::default()
+        .with_inner_size(PhysicalSize::new(1, 1))
+        .with_visible(false)
+        .with_title("compute");
+
+    VEToolkit::start(
+        Box::from(|toolkit: &VEToolkit| {
+            let app = ComputeApp::calculate(&toolkit);
+            Arc::new(Mutex::from(app)) as Arc<Mutex<dyn App>>
+        }),
+        window_attributes,
+    )
+}

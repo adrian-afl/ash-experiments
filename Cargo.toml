@@ -1,12 +1,10 @@
 [package]
-name = "ash-rs-experiment"
+name = "vengine-rs"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 winit = { version = "0.30.7", features = ["rwh_06"] }
-env_logger = "0.10"
-tokio = { version = "1.0.0", features = ["full"] }
 ash = { version = "0.38.0", features = ["linked"] }
 ash-window = "0.13.0"
 image = "0.25.5"

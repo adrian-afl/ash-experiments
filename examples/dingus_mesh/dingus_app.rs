@@ -1,26 +1,26 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferType};
-use crate::core::descriptor_set::VEDescriptorSet;
-use crate::core::descriptor_set_layout::{
+use vengine_rs::buffer::buffer::{VEBuffer, VEBufferType};
+use vengine_rs::core::descriptor_set::VEDescriptorSet;
+use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
     VEDescriptorSetLayoutField,
 };
-use crate::core::helpers::{make_clear_color_f32, make_clear_depth};
-use crate::core::memory_properties::VEMemoryProperties;
-use crate::core::scheduler::VEScheduler;
-use crate::core::semaphore::VESemaphore;
-use crate::core::shader_module::VEShaderModuleType;
-use crate::core::toolkit::{App, VEToolkit};
-use crate::graphics::attachment::VEAttachment;
-use crate::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERenderStage};
-use crate::graphics::vertex_attributes::VertexAttribFormat;
-use crate::graphics::vertex_buffer::VEVertexBuffer;
-use crate::image::filtering::VEFiltering;
-use crate::image::image::{VEImage, VEImageUsage};
-use crate::image::image_format::VEImageFormat;
-use crate::image::sampler::{VESampler, VESamplerAddressMode};
+use vengine_rs::core::helpers::{make_clear_color_f32, make_clear_depth};
+use vengine_rs::core::memory_properties::VEMemoryProperties;
+use vengine_rs::core::scheduler::VEScheduler;
+use vengine_rs::core::semaphore::VESemaphore;
+use vengine_rs::core::shader_module::VEShaderModuleType;
+use vengine_rs::core::toolkit::{App, VEToolkit};
+use vengine_rs::graphics::attachment::VEAttachment;
+use vengine_rs::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERenderStage};
+use vengine_rs::graphics::vertex_attributes::VertexAttribFormat;
+use vengine_rs::graphics::vertex_buffer::VEVertexBuffer;
+use vengine_rs::image::filtering::VEFiltering;
+use vengine_rs::image::image::{VEImage, VEImageUsage};
+use vengine_rs::image::image_format::VEImageFormat;
+use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
 use std::sync::Arc;
 
-pub struct MyApp {
+pub struct DingusApp {
     scheduler: VEScheduler,
     elapsed: f32,
 
@@ -51,8 +51,8 @@ struct Mesh {
     descriptor_set: VEDescriptorSet,
 }
 
-impl MyApp {
-    pub fn new(toolkit: &VEToolkit) -> MyApp {
+impl DingusApp {
+    pub fn new(toolkit: &VEToolkit) -> DingusApp {
         let mesh_stage = Self::make_mesh_stage(toolkit);
 
         let mut scheduler = toolkit.make_scheduler(2);
@@ -63,7 +63,7 @@ impl MyApp {
         scheduler.set_layer(0, vec![render_item]);
         scheduler.set_layer(1, vec![blit_item]);
 
-        let mut app = MyApp {
+        let mut app = DingusApp {
             mesh_stage,
             meshes: vec![],
 
@@ -71,7 +71,7 @@ impl MyApp {
             elapsed: 0.0,
         };
 
-        let dingus = app.make_mesh(toolkit, "dingus.jpg", "dingus.raw");
+        let dingus = app.make_mesh(toolkit, "examples/dingus_mesh/dingus.jpg", "examples/dingus_mesh/dingus.raw");
 
         app.meshes.push(dingus);
 
@@ -79,9 +79,9 @@ impl MyApp {
     }
 
     fn make_mesh_stage(toolkit: &VEToolkit) -> MeshStage {
-        let vertex_shader = toolkit.make_shader_module("vertex.spv", VEShaderModuleType::Vertex);
+        let vertex_shader = toolkit.make_shader_module("examples/dingus_mesh/vertex.spv", VEShaderModuleType::Vertex);
         let fragment_shader =
-            toolkit.make_shader_module("fragment.spv", VEShaderModuleType::Fragment);
+            toolkit.make_shader_module("examples/dingus_mesh/fragment.spv", VEShaderModuleType::Fragment);
 
         let mut global_descriptor_set_layout =
             toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
@@ -202,7 +202,7 @@ impl MyApp {
     }
 }
 
-impl App for MyApp {
+impl App for DingusApp {
     fn draw(&mut self, toolkit: &VEToolkit) {
         let pointer = self.mesh_stage.uniform_buffer.map() as *mut f32;
         unsafe {

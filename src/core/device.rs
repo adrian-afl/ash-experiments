@@ -81,7 +81,6 @@ impl VEDevice {
         extension_names.push(debug_utils::NAME.as_ptr());
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
-            println!("good");
             extension_names.push(ash::khr::portability_enumeration::NAME.as_ptr());
             // Enabling this extension is a requirement when using `VK_KHR_portability_subset`
             extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
@@ -95,10 +94,8 @@ impl VEDevice {
             .api_version(make_api_version(0, 1, 3, 0));
 
         let create_flags = if cfg!(any(target_os = "macos", target_os = "ios")) {
-            println!("good");
             InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
         } else {
-            println!("bad");
             InstanceCreateFlags::default()
         };
 
