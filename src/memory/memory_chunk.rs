@@ -1,11 +1,24 @@
-use std::fmt::{Debug, Formatter, Write};
 use crate::core::device::VEDevice;
+use ash::vk;
 use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, MemoryMapFlags};
+use std::fmt::{Debug, Formatter, Write};
 use std::sync::Arc;
+use thiserror::Error;
 use tracing::instrument;
-use crate::image::image::VEImage;
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
+
+#[derive(Error, Debug)]
+pub enum VEMemoryChunkError {
+    #[error("allocation failed")]
+    AllocationFailed(#[source] vk::Result),
+    #[error("binding buffer memory failed")]
+    BindingBufferMemoryFailed(#[source] vk::Result),
+    #[error("binding image memory failed")]
+    BindingImageMemoryFailed(#[source] vk::Result),
+    #[error("mapping failed")]
+    MappingFailed(#[source] vk::Result),
+}
 
 #[derive(Clone, Debug)]
 pub struct VESingleAllocation {
@@ -35,7 +48,7 @@ impl VEMemoryChunk {
         device: Arc<VEDevice>,
         chunk_identifier: u64,
         memory_type_index: u32,
-    ) -> VEMemoryChunk {
+    ) -> Result<VEMemoryChunk, VEMemoryChunkError> {
         let handle = unsafe {
             device
                 .device
@@ -45,15 +58,15 @@ impl VEMemoryChunk {
                         .memory_type_index(memory_type_index),
                     None,
                 )
-                .unwrap()
+                .map_err(VEMemoryChunkError::AllocationFailed)?
         };
-        VEMemoryChunk {
+        Ok(VEMemoryChunk {
             device,
             chunk_identifier,
             allocations: vec![],
             handle,
             identifier_counter: 0,
-        }
+        })
     }
 
     #[instrument]
@@ -72,7 +85,7 @@ impl VEMemoryChunk {
         buffer: Buffer,
         size: u64,
         offset: u64,
-    ) -> VESingleAllocation {
+    ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         {
             self.identifier_counter += 1;
         }
@@ -80,15 +93,16 @@ impl VEMemoryChunk {
             self.device
                 .device
                 .bind_buffer_memory(buffer, self.handle, offset as DeviceSize)
-                .unwrap()
+                .map_err(VEMemoryChunkError::BindingBufferMemoryFailed)?
         }
-        self.allocations.push(VESingleAllocation {
+        let allocation = VESingleAllocation {
             chunk_identifier: self.chunk_identifier,
             alloc_identifier: self.identifier_counter,
             size,
             offset,
-        });
-        self.allocations.last().unwrap().clone()
+        };
+        self.allocations.push(allocation.clone());
+        Ok(allocation)
     }
 
     #[instrument]
@@ -97,7 +111,7 @@ impl VEMemoryChunk {
         image: Image,
         size: u64,
         offset: u64,
-    ) -> VESingleAllocation {
+    ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         {
             self.identifier_counter += 1;
         }
@@ -105,15 +119,16 @@ impl VEMemoryChunk {
             self.device
                 .device
                 .bind_image_memory(image, self.handle, offset as DeviceSize)
-                .unwrap()
+                .map_err(VEMemoryChunkError::BindingImageMemoryFailed)?
         }
-        self.allocations.push(VESingleAllocation {
+        let allocation = VESingleAllocation {
             chunk_identifier: self.chunk_identifier,
             alloc_identifier: self.identifier_counter,
             size,
             offset,
-        });
-        self.allocations.last().unwrap().clone()
+        };
+        self.allocations.push(allocation.clone());
+        Ok(allocation)
     }
 
     #[instrument]
@@ -158,12 +173,16 @@ impl VEMemoryChunk {
     }
 
     #[instrument]
-    pub fn map(&self, offset: u64, size: u64) -> *mut core::ffi::c_void {
+    pub fn map(
+        &self,
+        offset: u64,
+        size: u64,
+    ) -> Result<*mut core::ffi::c_void, VEMemoryChunkError> {
         unsafe {
             self.device
                 .device
                 .map_memory(self.handle, offset, size, MemoryMapFlags::default())
-                .unwrap()
+                .map_err(VEMemoryChunkError::MappingFailed)
         }
     }
 

@@ -7,8 +7,17 @@ use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandBufferUsageFlags,
     PipelineStageFlags,
 };
+use std::fs::File;
+use std::io::Read;
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 use tracing::{event, Level};
+
+#[derive(Error, Debug)]
+pub enum VECommandBufferError {
+    #[error("creation failed")]
+    CreationFailed(#[from] vk::Result),
+}
 
 pub struct VECommandBuffer {
     device: Arc<VEDevice>,
@@ -16,23 +25,24 @@ pub struct VECommandBuffer {
     pub handle: CommandBuffer,
 }
 
-impl<'a> VECommandBuffer {
-    pub fn new(device: Arc<VEDevice>, command_pool: Arc<VECommandPool>) -> VECommandBuffer {
-        VECommandBuffer {
+impl VECommandBuffer {
+    pub fn new(
+        device: Arc<VEDevice>,
+        command_pool: Arc<VECommandPool>,
+    ) -> Result<VECommandBuffer, VECommandBufferError> {
+        let handle = unsafe {
+            device.device.allocate_command_buffers(
+                &CommandBufferAllocateInfo::default()
+                    .level(CommandBufferLevel::PRIMARY)
+                    .command_buffer_count(1)
+                    .command_pool(command_pool.handle),
+            )?[0]
+        };
+        Ok(VECommandBuffer {
             device: device.clone(),
             command_pool: command_pool.clone(),
-            handle: unsafe {
-                device
-                    .device
-                    .allocate_command_buffers(
-                        &CommandBufferAllocateInfo::default()
-                            .level(CommandBufferLevel::PRIMARY)
-                            .command_buffer_count(1)
-                            .command_pool(command_pool.handle),
-                    )
-                    .unwrap()[0]
-            },
-        }
+            handle,
+        })
     }
 
     pub fn begin(&self, flags: CommandBufferUsageFlags) {

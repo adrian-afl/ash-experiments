@@ -9,7 +9,8 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum VEDescriptorSetError {
     #[error("creation failed")]
-    CreationFailed(vk::Result),
+    CreationFailed(#[from] vk::Result),
+
     #[error("image view not found when binding an image")]
     ImageViewNotFound,
 }
@@ -29,12 +30,7 @@ impl VEDescriptorSet {
         let info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(*pool)
             .set_layouts(&layouts);
-        let set = unsafe {
-            device
-                .device
-                .allocate_descriptor_sets(&info)
-                .map_err(|e| VEDescriptorSetError::CreationFailed(e))?[0]
-        };
+        let set = unsafe { device.device.allocate_descriptor_sets(&info)?[0] };
         Ok(VEDescriptorSet { device, set })
     }
 

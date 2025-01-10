@@ -17,7 +17,7 @@ use winit::window::WindowAttributes;
 struct ComputeApp {}
 
 impl ComputeApp {
-    pub fn calculate(toolkit: &&VEToolkit) -> ComputeApp {
+    pub fn calculate(toolkit: &VEToolkit) -> ComputeApp {
         let mut buffer = toolkit.make_buffer(
             VEBufferType::Storage,
             128,

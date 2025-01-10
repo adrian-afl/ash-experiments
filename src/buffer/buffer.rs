@@ -1,10 +1,26 @@
 use crate::core::device::VEDevice;
 use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
-use crate::memory::memory_chunk::VESingleAllocation;
-use crate::memory::memory_manager::VEMemoryManager;
+use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
+use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
 use ash::vk::{Buffer, BufferCreateInfo, DeviceSize, MemoryPropertyFlags, SharingMode};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LockResult, Mutex, MutexGuard, PoisonError};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEBufferError {
+    #[error("creation failed")]
+    CreationFailed(#[from] vk::Result),
+
+    #[error("binding buffer memory failed")]
+    BindingBufferMemoryFailed(#[from] VEMemoryChunkError),
+
+    #[error("locking memory manager mutex failed")]
+    LockingMemoryManagerFailed,
+
+    #[error("mapping failed")]
+    MemoryManagerError(#[from] VEMemoryManagerError),
+}
 
 #[derive(Debug)]
 pub enum VEBufferType {
@@ -31,7 +47,7 @@ impl VEBuffer {
         typ: VEBufferType,
         size: u64,
         memory_properties: Option<VEMemoryProperties>,
-    ) -> VEBuffer {
+    ) -> Result<VEBuffer, VEBufferError> {
         let usage = match typ {
             VEBufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
             VEBufferType::Storage => vk::BufferUsageFlags::STORAGE_BUFFER,
@@ -60,35 +76,49 @@ impl VEBuffer {
             let allocation = {
                 memory_manager
                     .lock()
-                    .unwrap()
-                    .bind_buffer_memory(mem_index, buffer, mem_reqs.size)
+                    .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
+                    .bind_buffer_memory(mem_index, buffer, mem_reqs.size)?
             };
 
-            VEBuffer {
+            Ok(VEBuffer {
                 device,
                 memory_manager,
                 buffer,
                 allocation,
                 size,
                 typ,
-            }
+            })
         }
     }
 
-    pub fn map(&mut self) -> *mut core::ffi::c_void {
-        self.memory_manager.lock().unwrap().map(&self.allocation)
+    pub fn map(&mut self) -> Result<*mut core::ffi::c_void, VEBufferError> {
+        self.memory_manager
+            .lock()
+            .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
+            .map(&self.allocation)
+            .map_err(VEBufferError::MemoryManagerError))
     }
 
-    pub fn unmap(&mut self) {
-        self.memory_manager.lock().unwrap().unmap(&self.allocation)
+    pub fn unmap(&mut self) -> Result<(), VEBufferError> {
+        self.memory_manager
+            .lock()
+            .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
+            .unmap(&self.allocation)
+            .map_err(VEBufferError::MemoryManagerError)
     }
 }
 
 impl Drop for VEBuffer {
     fn drop(&mut self) {
-        self.memory_manager
-            .lock()
-            .unwrap()
-            .free_allocation(&self.allocation);
+        let mut locking_result = self.memory_manager
+            .lock();
+        match locking_result {
+            Ok(mut mem) => match {mem.free_allocation(&self.allocation)} {
+                Ok(_) => (),
+                Err(_) => {}
+            }
+            Err(_) => {panic!("Locking memory manager failed")}
+        }
+        
     }
 }
