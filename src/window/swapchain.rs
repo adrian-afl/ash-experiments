@@ -34,11 +34,26 @@ pub enum VESwapchainError {
     #[error("command buffer error")]
     CommandBufferError(#[from] VECommandBufferError),
 
+    #[error("swapchain creation failed")]
+    SwapchainCreationFailed(#[source] vk::Result),
+
     #[error("present failed")]
     PresentFailed(#[source] vk::Result),
 
     #[error("acquire failed")]
     AcquireFailed(#[source] vk::Result),
+
+    #[error("cannot get physical device surface formats")]
+    CannotGetPhysicalDeviceSurfaceFormats(#[source] vk::Result),
+
+    #[error("cannot get physical device surface capabilities")]
+    CannotGetPhysicalDeviceSurfaceCapabilities(#[source] vk::Result),
+
+    #[error("cannot get physical device surface present modes")]
+    CannotGetPhysicalDeviceSurfacePresentModes(#[source] vk::Result),
+
+    #[error("cannot get swapchain images")]
+    CannotGetSwapchainImages(#[source] vk::Result),
 }
 
 pub struct VESwapchain {
@@ -81,7 +96,7 @@ impl VESwapchain {
             main_device_queue.clone(),
             command_pool.clone(),
             winit_window.inner_size(),
-        );
+        )?;
 
         let acquire_ready_semaphore = VESemaphore::new(device.clone())?;
         let blit_done_semaphore = VESemaphore::new(device.clone())?;
@@ -109,21 +124,21 @@ impl VESwapchain {
         main_device_queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
         new_size: PhysicalSize<u32>,
-    ) -> (SwapchainKHR, swapchain::Device, Vec<VEImage>) {
+    ) -> Result<(SwapchainKHR, swapchain::Device, Vec<VEImage>), VESwapchainError> {
         let swapchain_loader = swapchain::Device::new(&device.instance, &device.device);
 
         let surface_format = unsafe {
             device
                 .surface_loader
                 .get_physical_device_surface_formats(device.physical_device, device.surface)
-                .unwrap()[0]
+                .map_err(VESwapchainError::CannotGetPhysicalDeviceSurfaceFormats)?[0]
         };
 
         let surface_capabilities = unsafe {
             device
                 .surface_loader
                 .get_physical_device_surface_capabilities(device.physical_device, device.surface)
-                .unwrap()
+                .map_err(VESwapchainError::CannotGetPhysicalDeviceSurfaceCapabilities)?
         };
         let mut desired_image_count = surface_capabilities.min_image_count + 1;
         if surface_capabilities.max_image_count > 0
@@ -150,7 +165,7 @@ impl VESwapchain {
             device
                 .surface_loader
                 .get_physical_device_surface_present_modes(device.physical_device, device.surface)
-                .unwrap()
+                .map_err(VESwapchainError::CannotGetPhysicalDeviceSurfacePresentModes)?
         };
         let present_mode = present_modes
             .iter()
@@ -175,11 +190,14 @@ impl VESwapchain {
         let swapchain = unsafe {
             swapchain_loader
                 .create_swapchain(&swapchain_create_info, None)
-                .unwrap()
+                .map_err(VESwapchainError::SwapchainCreationFailed)?
         };
 
-        let present_images_raw =
-            unsafe { swapchain_loader.get_swapchain_images(swapchain).unwrap() };
+        let present_images_raw = unsafe {
+            swapchain_loader
+                .get_swapchain_images(swapchain)
+                .map_err(VESwapchainError::CannotGetSwapchainImages)?
+        };
 
         let mut present_images = vec![];
         for i in 0..present_images_raw.len() {
@@ -191,9 +209,9 @@ impl VESwapchain {
                 surface_resolution.height,
                 surface_format.format,
                 present_images_raw[i],
-            ))
+            )?)
         }
-        (swapchain, swapchain_loader, present_images)
+        Ok((swapchain, swapchain_loader, present_images))
     }
 
     #[instrument]
@@ -210,7 +228,7 @@ impl VESwapchain {
             self.main_device_queue.clone(),
             self.command_pool.clone(),
             new_size,
-        );
+        )?;
 
         self.present_images = present_images;
 
@@ -237,13 +255,21 @@ impl VESwapchain {
         source: &VEImage,
         wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
     ) -> Result<(), VESwapchainError> {
-        self.acquire_ready_semaphore.lock().unwrap().state = SemaphoreState::Pending;
+        self.acquire_ready_semaphore
+            .lock()
+            .map_err(|_| VESwapchainError::AcquireSemaphoreLockingFailed)?
+            .state = SemaphoreState::Pending;
         event!(
             Level::TRACE,
             "Setting semaphore acquire_ready_semaphore to Pending"
         );
         let ack_semaphore = self.acquire_ready_semaphore.clone();
-        let acquired = self.acquire_next_image(ack_semaphore.lock().unwrap().handle)?;
+        let acquired = self.acquire_next_image(
+            ack_semaphore
+                .lock()
+                .map_err(|_| VESwapchainError::AcquireSemaphoreLockingFailed)?
+                .handle,
+        )?;
 
         let blit_semaphore = &self.blit_done_semaphore;
         let mut wait_handles: Vec<Arc<Mutex<VESemaphore>>> = vec![];

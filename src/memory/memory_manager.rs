@@ -77,7 +77,7 @@ impl VEMemoryManager {
         memory_type_index: u32,
         size: u64,
     ) -> Result<(&mut VEMemoryChunk, u64), VEMemoryChunkError> {
-        if (!self.chunks.contains_key(&memory_type_index)) {
+        if !self.chunks.contains_key(&memory_type_index) {
             self.chunks.insert(memory_type_index, vec![]);
         }
         let chunks_for_type = self.chunks.get_mut(&memory_type_index).unwrap();

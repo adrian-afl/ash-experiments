@@ -1,11 +1,9 @@
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::image::image::VEImage;
-use crate::memory::memory_chunk::VESingleAllocation;
-use crate::memory::memory_manager::VEMemoryManager;
+use crate::image::image::{VEImage, VEImageError};
 use ash::vk;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 impl VEImage {
     pub fn from_swapchain_present_image(
@@ -18,7 +16,7 @@ impl VEImage {
 
         format: vk::Format,
         image_handle: vk::Image,
-    ) -> VEImage {
+    ) -> Result<VEImage, VEImageError> {
         let mut image = VEImage {
             device,
             queue,
@@ -39,8 +37,8 @@ impl VEImage {
             current_layout: vk::ImageLayout::UNDEFINED,
         };
 
-        image.transition_layout(image.current_layout, vk::ImageLayout::PRESENT_SRC_KHR);
+        image.transition_layout(image.current_layout, vk::ImageLayout::PRESENT_SRC_KHR)?;
 
-        image
+        Ok(image)
     }
 }

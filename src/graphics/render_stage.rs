@@ -1,17 +1,33 @@
-use crate::core::command_buffer::VECommandBuffer;
+use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::VECommandPool;
 use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
 use crate::core::device::VEDevice;
 use crate::core::shader_module::VEShaderModule;
 use crate::graphics::attachment::VEAttachment;
-use crate::graphics::framebuffer::VEFrameBuffer;
-use crate::graphics::graphics_pipeline::VEGraphicsPipeline;
-use crate::graphics::renderpass::VERenderPass;
+use crate::graphics::framebuffer::{VEFrameBuffer, VEFrameBufferError};
+use crate::graphics::graphics_pipeline::{VEGraphicsPipeline, VEGraphicsPipelineError};
+use crate::graphics::renderpass::{VERenderPass, VERenderPassError};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
 use crate::graphics::vertex_buffer::VEVertexBuffer;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VERenderStageError {
+    #[error("graphics pipeline error")]
+    GraphicsPipelineError(#[from] VEGraphicsPipelineError),
+
+    #[error("command buffer error")]
+    CommandBufferError(#[from] VECommandBufferError),
+
+    #[error("render pass error")]
+    RenderPassError(#[from] VERenderPassError),
+
+    #[error("framebuffer error")]
+    FrameBufferError(#[from] VEFrameBufferError),
+}
 
 static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::GRAPHICS;
 
@@ -75,8 +91,8 @@ impl VERenderStage {
         vertex_attributes: &[VertexAttribFormat],
         primitive_topology: VEPrimitiveTopology,
         cull_mode: VECullMode,
-    ) -> VERenderStage {
-        let render_pass = VERenderPass::new(device.clone(), attachments);
+    ) -> Result<VERenderStage, VERenderStageError> {
+        let render_pass = VERenderPass::new(device.clone(), attachments)?;
 
         let framebuffer = VEFrameBuffer::new(
             device.clone(),
@@ -84,7 +100,7 @@ impl VERenderStage {
             viewport_height,
             &render_pass,
             attachments,
-        );
+        )?;
 
         let pipeline = VEGraphicsPipeline::new(
             device.clone(),
@@ -98,7 +114,7 @@ impl VERenderStage {
             vertex_attributes,
             get_primitive_topology(primitive_topology),
             get_cull_flags(cull_mode),
-        );
+        )?;
 
         let clear_values = attachments
             .iter()
@@ -108,16 +124,16 @@ impl VERenderStage {
             })
             .collect();
 
-        VERenderStage {
+        Ok(VERenderStage {
             device: device.clone(),
             pipeline: Arc::new(pipeline),
-            command_buffer: VECommandBuffer::new(device, command_pool.clone()),
+            command_buffer: VECommandBuffer::new(device, command_pool.clone())?,
             render_pass,
             framebuffer,
             viewport_width,
             viewport_height,
             clear_values,
-        }
+        })
     }
 
     pub fn set_descriptor_set(&self, index: u32, set: &VEDescriptorSet) {
@@ -133,9 +149,9 @@ impl VERenderStage {
         }
     }
 
-    pub fn begin_recording(&self) {
+    pub fn begin_recording(&self) -> Result<(), VERenderStageError> {
         self.command_buffer
-            .begin(vk::CommandBufferUsageFlags::empty());
+            .begin(vk::CommandBufferUsageFlags::empty())?;
 
         let rect = vk::Rect2D::default()
             .offset(vk::Offset2D::default())
@@ -164,15 +180,17 @@ impl VERenderStage {
                 self.pipeline.pipeline,
             );
         }
+        Ok(())
     }
 
-    pub fn end_recording(&self) {
+    pub fn end_recording(&self) -> Result<(), VERenderStageError> {
         unsafe {
             self.device
                 .device
                 .cmd_end_render_pass(self.command_buffer.handle);
         }
-        self.command_buffer.end();
+        self.command_buffer.end()?;
+        Ok(())
     }
 
     pub fn draw_instanced(&self, vertex_buffer: &VEVertexBuffer, instances: u32) {

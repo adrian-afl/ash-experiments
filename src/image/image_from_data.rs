@@ -59,7 +59,7 @@ impl VEImage {
             staging_buffer.unmap()?;
         }
 
-        result.transition_layout(result.current_layout, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+        result.transition_layout(result.current_layout, vk::ImageLayout::TRANSFER_DST_OPTIMAL)?;
 
         let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone())?;
         //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -98,7 +98,7 @@ impl VEImage {
         result.transition_layout(
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::GENERAL,
-        );
+        )?;
 
         Ok(result)
     }

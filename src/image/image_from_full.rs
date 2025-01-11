@@ -140,7 +140,7 @@ impl VEImage {
             view: Some(image_view_handle),
             current_layout: vk::ImageLayout::PREINITIALIZED,
         };
-        image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL);
+        image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL)?;
 
         Ok(image)
     }

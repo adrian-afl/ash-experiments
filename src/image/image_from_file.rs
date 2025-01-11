@@ -5,7 +5,6 @@ use crate::core::memory_properties::VEMemoryProperties;
 use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::VEImageFormat;
 use crate::memory::memory_manager::VEMemoryManager;
-use ash::vk;
 use image::{EncodableLayout, ImageReader};
 use std::sync::{Arc, Mutex};
 

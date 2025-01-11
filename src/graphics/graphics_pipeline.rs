@@ -4,11 +4,24 @@ use crate::core::shader_module::VEShaderModule;
 use crate::graphics::attachment::{AttachmentBlending, VEAttachment};
 use crate::graphics::renderpass::VERenderPass;
 use crate::graphics::vertex_attributes::{
-    create_vertex_input_state_descriptions, VertexAttribFormat,
+    create_vertex_input_state_descriptions, VEVertexAttributesError, VertexAttribFormat,
 };
 use ash::vk;
-use ash::vk::{ColorComponentFlags, PrimitiveTopology, RenderPass};
+use ash::vk::ColorComponentFlags;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEGraphicsPipelineError {
+    #[error("layout creation failed")]
+    LayoutCreationFailed(#[source] vk::Result),
+
+    #[error("pipeline creation failed")]
+    PipelineCreationFailed(#[source] vk::Result),
+
+    #[error("vertex attributes error")]
+    VertexAttributesError(#[from] VEVertexAttributesError),
+}
 
 pub struct VEGraphicsPipeline {
     device: Arc<VEDevice>,
@@ -29,7 +42,7 @@ impl VEGraphicsPipeline {
         vertex_attributes: &[VertexAttribFormat],
         primitive_topology: vk::PrimitiveTopology,
         cull_flags: vk::CullModeFlags,
-    ) -> VEGraphicsPipeline {
+    ) -> Result<VEGraphicsPipeline, VEGraphicsPipelineError> {
         let vertex_shader_stage_info = vk::PipelineShaderStageCreateInfo::default()
             .stage(vk::ShaderStageFlags::VERTEX)
             .module(vertex_shader.handle)
@@ -44,7 +57,7 @@ impl VEGraphicsPipeline {
 
         let layouts: Vec<vk::DescriptorSetLayout> = set_layouts.iter().map(|x| x.layout).collect();
 
-        let vertex_attrib_descriptions = create_vertex_input_state_descriptions(vertex_attributes);
+        let vertex_attrib_descriptions = create_vertex_input_state_descriptions(vertex_attributes)?;
         let tmp_binds = [vertex_attrib_descriptions.0];
         let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_binding_descriptions(&tmp_binds)
@@ -91,7 +104,7 @@ impl VEGraphicsPipeline {
 
         let mut enable_depth = false;
 
-        let mut attas: Vec<vk::PipelineColorBlendAttachmentState> = vec![];
+        let mut attachment_blend_states: Vec<vk::PipelineColorBlendAttachmentState> = vec![];
 
         //for att in render_pass.attachments {
         for i in 0..attachments.len() {
@@ -134,7 +147,7 @@ impl VEGraphicsPipeline {
                         }
                     },
                 }
-                attas.push(blend_state);
+                attachment_blend_states.push(blend_state);
             } else {
                 // is a depth buffer, enable depth
                 enable_depth = true;
@@ -155,7 +168,7 @@ impl VEGraphicsPipeline {
         let color_blending = vk::PipelineColorBlendStateCreateInfo::default()
             .logic_op_enable(false)
             .logic_op(vk::LogicOp::COPY)
-            .attachments(&attas)
+            .attachments(&attachment_blend_states)
             .blend_constants([1.0, 1.0, 1.0, 1.0]);
 
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::default().set_layouts(&layouts);
@@ -163,7 +176,7 @@ impl VEGraphicsPipeline {
             device
                 .device
                 .create_pipeline_layout(&pipeline_layout_info, None)
-                .unwrap()
+                .map_err(VEGraphicsPipelineError::LayoutCreationFailed)?
         };
 
         let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
@@ -183,13 +196,13 @@ impl VEGraphicsPipeline {
             device
                 .device
                 .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
-                .unwrap()[0]
+                .map_err(|e| VEGraphicsPipelineError::LayoutCreationFailed(e.1))?[0]
         };
 
-        VEGraphicsPipeline {
+        Ok(VEGraphicsPipeline {
             device,
             pipeline,
             layout: pipeline_layout,
-        }
+        })
     }
 }

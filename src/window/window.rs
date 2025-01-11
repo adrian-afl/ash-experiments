@@ -1,5 +1,4 @@
 use crate::core::toolkit::VEToolkit;
-use crate::window::swapchain::VESwapchain;
 use ash::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
@@ -7,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
+use winit::window::{Window, WindowAttributes, WindowId};
 
 pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: VEToolkit);

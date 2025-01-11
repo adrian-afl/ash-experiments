@@ -1,7 +1,7 @@
 use crate::core::device::VEDevice;
 use ash::vk;
 use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, MemoryMapFlags};
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::instrument;
@@ -147,24 +147,24 @@ impl VEMemoryChunk {
     #[instrument]
     fn is_free_space(&self, offset: u64, size: u64) -> bool {
         let end = offset + size;
-        if (end >= CHUNK_SIZE) {
+        if end >= CHUNK_SIZE {
             return false;
         }
         for a in &self.allocations {
-            let aend = a.offset + a.size;
-            if offset >= a.offset && offset < aend {
+            let allocation_end = a.offset + a.size;
+            if offset >= a.offset && offset < allocation_end {
                 // if start of alloc collides
                 return false;
             }
-            if end >= a.offset && end < aend {
+            if end >= a.offset && end < allocation_end {
                 // if end of alloc collides
                 return false;
             }
-            if offset <= a.offset && end > aend {
+            if offset <= a.offset && end > allocation_end {
                 // if alloc contains element
                 return false;
             }
-            if offset >= a.offset && end < aend {
+            if offset >= a.offset && end < allocation_end {
                 // if elements contains alloc
                 return false;
             }

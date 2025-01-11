@@ -1,6 +1,12 @@
 use crate::image::image::VEImage;
 use ash::vk;
-use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEAttachmentError {
+    #[error("image view not found")]
+    ImageViewNotFound,
+}
 
 pub enum AttachmentBlending {
     Additive,
@@ -21,7 +27,7 @@ impl VEAttachment {
         blending: Option<AttachmentBlending>,
         clear: Option<vk::ClearValue>,
         for_present: bool,
-    ) -> VEAttachment {
+    ) -> Result<VEAttachment, VEAttachmentError> {
         let description = vk::AttachmentDescription::default()
             .format(image.format)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -42,12 +48,12 @@ impl VEAttachment {
                 vk::ImageLayout::GENERAL
             });
 
-        VEAttachment {
-            image_view: image.view.unwrap(),
+        Ok(VEAttachment {
+            image_view: image.view.ok_or(VEAttachmentError::ImageViewNotFound)?,
             is_depth: image.is_depth(),
             description,
             blending,
             clear,
-        }
+        })
     }
 }

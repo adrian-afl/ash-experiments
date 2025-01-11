@@ -5,11 +5,11 @@ use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::image::transition_image_layout::transition_image_layout;
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
-use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
+use crate::memory::memory_manager::VEMemoryManagerError;
 use ash::vk;
 use std::fmt::{Debug, Formatter};
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 #[path = "./image_from_data.rs"]

@@ -19,13 +19,13 @@ pub enum VEComputeStageError {
     CommandBufferError(#[from] VECommandBufferError),
 }
 
+static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
+
 pub struct VEComputeStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEComputePipeline>,
     pub command_buffer: VECommandBuffer,
 }
-
-static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
 
 impl VEComputeStage {
     pub fn new(

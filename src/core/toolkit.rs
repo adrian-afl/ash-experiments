@@ -1,30 +1,47 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferType};
-use crate::compute::compute_stage::VEComputeStage;
-use crate::core::command_buffer::VECommandBuffer;
-use crate::core::command_pool::VECommandPool;
-use crate::core::descriptor_set_layout::{VEDescriptorSetLayout, VEDescriptorSetLayoutField};
-use crate::core::device::VEDevice;
+use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
+use crate::compute::compute_stage::{VEComputeStage, VEComputeStageError};
+use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
+use crate::core::command_pool::{VECommandPool, VECommandPoolError};
+use crate::core::descriptor_set_layout::{
+    VEDescriptorSetLayout, VEDescriptorSetLayoutError, VEDescriptorSetLayoutField,
+};
+use crate::core::device::{VEDevice, VEDeviceError};
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::memory_properties::VEMemoryProperties;
 use crate::core::scheduler::VEScheduler;
-use crate::core::semaphore::VESemaphore;
-use crate::core::shader_module::{VEShaderModule, VEShaderModuleType};
+use crate::core::semaphore::{VESemaphore, VESemaphoreError};
+use crate::core::shader_module::{VEShaderModule, VEShaderModuleError, VEShaderModuleType};
 use crate::graphics::attachment::VEAttachment;
-use crate::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERenderStage};
+use crate::graphics::render_stage::{
+    VECullMode, VEPrimitiveTopology, VERenderStage, VERenderStageError,
+};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
-use crate::graphics::vertex_buffer::VEVertexBuffer;
+use crate::graphics::vertex_buffer::{VEVertexBuffer, VEVertexBufferError};
 use crate::image::filtering::VEFiltering;
-use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::VEImageFormat;
-use crate::image::sampler::{VESampler, VESamplerAddressMode};
+use crate::image::sampler::{VESampler, VESamplerAddressMode, VESamplerError};
 use crate::memory::memory_manager::VEMemoryManager;
-use crate::window::swapchain::VESwapchain;
+use crate::window::swapchain::{VESwapchain, VESwapchainError};
 use crate::window::window::{AppCallback, VEWindow};
 use ash::vk;
 use std::sync::{Arc, Mutex};
 use std::{fs, io};
+use thiserror::Error;
 use winit::dpi::PhysicalSize;
 use winit::window::WindowAttributes;
+
+#[derive(Error, Debug)]
+pub enum VEToolkitError {
+    #[error("window error error")]
+    DeviceError(#[from] VEDeviceError),
+
+    #[error("swapchain error")]
+    SwapchainError(#[from] VESwapchainError),
+
+    #[error("command pool error")]
+    CommandPoolError(#[from] VECommandPoolError),
+}
 
 pub trait App {
     fn draw(&mut self, toolkit: &VEToolkit);
@@ -78,7 +95,7 @@ impl VEToolkit {
     pub fn start(
         create_app: Box<dyn Fn(&VEToolkit) -> Arc<Mutex<dyn App>>>,
         initial_window_attributes: WindowAttributes,
-    ) {
+    ) -> Result<(), VEToolkitError> {
         let callbacks = Arc::new(Mutex::from(VEToolkitCallbacks {
             toolkit: None,
             window: None,
@@ -89,14 +106,15 @@ impl VEToolkit {
             callbacks.clone(),
             initial_window_attributes,
         )));
+        Ok(())
     }
 
-    pub fn new(window: &VEWindow) -> VEToolkit {
-        let device = Arc::new(VEDevice::new(&window));
+    pub fn new(window: &VEWindow) -> Result<VEToolkit, VEToolkitError> {
+        let device = Arc::new(VEDevice::new(&window)?);
 
         let mut memory_manager = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
 
-        let command_pool = Arc::new(VECommandPool::new(device.clone()));
+        let command_pool = Arc::new(VECommandPool::new(device.clone())?);
 
         let queue = Arc::new(VEMainDeviceQueue::new(device.clone()));
 
@@ -105,30 +123,33 @@ impl VEToolkit {
             device.clone(),
             queue.clone(),
             command_pool.clone(),
-            memory_manager.clone(),
-        )));
+        )?));
 
-        VEToolkit {
+        Ok(VEToolkit {
             device,
             swapchain,
             queue,
             command_pool,
             memory_manager,
-        }
+        })
     }
 
-    pub fn make_command_buffer(&self) -> VECommandBuffer {
+    pub fn make_command_buffer(&self) -> Result<VECommandBuffer, VECommandBufferError> {
         VECommandBuffer::new(self.device.clone(), self.command_pool.clone())
     }
 
-    pub fn make_shader_module(&self, path: &str, typ: VEShaderModuleType) -> VEShaderModule {
+    pub fn make_shader_module(
+        &self,
+        path: &str,
+        typ: VEShaderModuleType,
+    ) -> Result<VEShaderModule, VEShaderModuleError> {
         VEShaderModule::new(self.device.clone(), &mut fs::File::open(path).unwrap(), typ)
     }
 
     pub fn make_descriptor_set_layout(
         &self,
         fields: &[VEDescriptorSetLayoutField],
-    ) -> VEDescriptorSetLayout {
+    ) -> Result<VEDescriptorSetLayout, VEDescriptorSetLayoutError> {
         VEDescriptorSetLayout::new(self.device.clone(), fields)
     }
 
@@ -143,7 +164,7 @@ impl VEToolkit {
         usages: &[VEImageUsage],
 
         memory_properties: Option<VEMemoryProperties>,
-    ) -> VEImage {
+    ) -> Result<VEImage, VEImageError> {
         VEImage::from_full(
             self.device.clone(),
             self.queue.clone(),
@@ -171,7 +192,7 @@ impl VEToolkit {
         usages: &[VEImageUsage],
 
         memory_properties: Option<VEMemoryProperties>,
-    ) -> VEImage {
+    ) -> Result<VEImage, VEImageError> {
         VEImage::from_data(
             self.device.clone(),
             self.queue.clone(),
@@ -187,7 +208,11 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_image_from_file(&self, path: &str, usages: &[VEImageUsage]) -> VEImage {
+    pub fn make_image_from_file(
+        &self,
+        path: &str,
+        usages: &[VEImageUsage],
+    ) -> Result<VEImage, VEImageError> {
         VEImage::from_file(
             self.device.clone(),
             self.queue.clone(),
@@ -206,7 +231,7 @@ impl VEToolkit {
         mag_filter: VEFiltering,
 
         anisotropy: bool,
-    ) -> VESampler {
+    ) -> Result<VESampler, VESamplerError> {
         VESampler::new(
             self.device.clone(),
             sampler_address_mode,
@@ -216,7 +241,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_semaphore(&self) -> VESemaphore {
+    pub fn make_semaphore(&self) -> Result<VESemaphore, VESemaphoreError> {
         VESemaphore::new(self.device.clone())
     }
 
@@ -225,7 +250,7 @@ impl VEToolkit {
         typ: VEBufferType,
         size: vk::DeviceSize,
         memory_properties: Option<VEMemoryProperties>,
-    ) -> VEBuffer {
+    ) -> Result<VEBuffer, VEBufferError> {
         VEBuffer::new(
             self.device.clone(),
             self.memory_manager.clone(),
@@ -243,7 +268,7 @@ impl VEToolkit {
         &self,
         path: &str,
         vertex_attributes: &[VertexAttribFormat],
-    ) -> VEVertexBuffer {
+    ) -> Result<VEVertexBuffer, VEVertexBufferError> {
         VEVertexBuffer::from_file(
             self.device.clone(),
             self.memory_manager.clone(),
@@ -256,7 +281,7 @@ impl VEToolkit {
         &self,
         set_layouts: &[&VEDescriptorSetLayout],
         shader: &VEShaderModule,
-    ) -> VEComputeStage {
+    ) -> Result<VEComputeStage, VEComputeStageError> {
         VEComputeStage::new(
             self.device.clone(),
             self.command_pool.clone(),
@@ -276,7 +301,7 @@ impl VEToolkit {
         vertex_attributes: &[VertexAttribFormat],
         primitive_topology: VEPrimitiveTopology,
         cull_mode: VECullMode,
-    ) -> VERenderStage {
+    ) -> Result<VERenderStage, VERenderStageError> {
         VERenderStage::new(
             self.device.clone(),
             self.command_pool.clone(),
