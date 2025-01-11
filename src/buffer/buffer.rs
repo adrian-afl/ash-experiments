@@ -3,8 +3,8 @@ use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProper
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
-use ash::vk::{Buffer, BufferCreateInfo, DeviceSize, MemoryPropertyFlags, SharingMode};
-use std::sync::{Arc, LockResult, Mutex, MutexGuard, PoisonError};
+use ash::vk::{Buffer, BufferCreateInfo, SharingMode};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -20,6 +20,9 @@ pub enum VEBufferError {
 
     #[error("mapping failed")]
     MemoryManagerError(#[from] VEMemoryManagerError),
+
+    #[error("no suitable memory type found")]
+    NoSuitableMemoryTypeFound,
 }
 
 #[derive(Debug)]
@@ -65,7 +68,7 @@ impl VEBuffer {
                         .sharing_mode(SharingMode::EXCLUSIVE),
                     None,
                 )
-                .unwrap();
+                .map_err(VEBufferError::CreationFailed)?;
 
             let mem_reqs = device.device.get_buffer_memory_requirements(buffer);
             let mem_index = device.find_memory_type(
@@ -73,11 +76,12 @@ impl VEBuffer {
                 get_memory_properties_flags(memory_properties),
             );
 
-            let allocation = {
-                memory_manager
+            let allocation = match mem_index {
+                None => return Err(VEBufferError::NoSuitableMemoryTypeFound),
+                Some(mem_index) => memory_manager
                     .lock()
                     .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
-                    .bind_buffer_memory(mem_index, buffer, mem_reqs.size)?
+                    .bind_buffer_memory(mem_index, buffer, mem_reqs.size)?,
             };
 
             Ok(VEBuffer {
@@ -96,7 +100,7 @@ impl VEBuffer {
             .lock()
             .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
             .map(&self.allocation)
-            .map_err(VEBufferError::MemoryManagerError))
+            .map_err(VEBufferError::MemoryManagerError)
     }
 
     pub fn unmap(&mut self) -> Result<(), VEBufferError> {
@@ -110,15 +114,15 @@ impl VEBuffer {
 
 impl Drop for VEBuffer {
     fn drop(&mut self) {
-        let mut locking_result = self.memory_manager
-            .lock();
+        let mut locking_result = self.memory_manager.lock();
         match locking_result {
-            Ok(mut mem) => match {mem.free_allocation(&self.allocation)} {
+            Ok(mut mem) => match { mem.free_allocation(&self.allocation) } {
                 Ok(_) => (),
                 Err(_) => {}
+            },
+            Err(_) => {
+                panic!("Locking memory manager failed")
             }
-            Err(_) => {panic!("Locking memory manager failed")}
         }
-        
     }
 }

@@ -1,4 +1,5 @@
 use ash::vk;
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug)]
 pub enum VertexAttribFormat {
@@ -89,41 +90,49 @@ pub(crate) fn get_vertex_attribute_type_byte_size(attrib: &VertexAttribFormat) -
     }
 }
 
-fn resolve_vertex_attribute_format(attrib: &VertexAttribFormat) -> vk::Format {
+#[derive(Error, Debug)]
+pub enum VEVertexAttributesError {
+    #[error("invalid format")]
+    InvalidFormat,
+}
+
+fn resolve_vertex_attribute_format(
+    attrib: &VertexAttribFormat,
+) -> Result<vk::Format, VEVertexAttributesError> {
     match attrib {
-        VertexAttribFormat::R8inorm => vk::Format::R8_SNORM,
-        VertexAttribFormat::RG8inorm => vk::Format::R8G8_SNORM,
-        VertexAttribFormat::RGB8inorm => vk::Format::R8G8B8_SNORM,
-        VertexAttribFormat::RGBA8inorm => vk::Format::R8G8B8A8_SNORM,
-        VertexAttribFormat::R8unorm => vk::Format::R8_UNORM,
-        VertexAttribFormat::RG8unorm => vk::Format::R8G8_UNORM,
-        VertexAttribFormat::RGB8unorm => vk::Format::R8G8B8_UNORM,
-        VertexAttribFormat::RGBA8unorm => vk::Format::R8G8B8A8_UNORM,
-        VertexAttribFormat::R16i => vk::Format::R16_SINT,
-        VertexAttribFormat::RG16i => vk::Format::R16G16_SINT,
-        VertexAttribFormat::RGB16i => vk::Format::R16G16B16_SINT,
-        VertexAttribFormat::RGBA16i => vk::Format::R16G16B16A16_SINT,
-        VertexAttribFormat::R16u => vk::Format::R16_UINT,
-        VertexAttribFormat::RG16u => vk::Format::R16G16_UINT,
-        VertexAttribFormat::RGB16u => vk::Format::R16G16B16_UINT,
-        VertexAttribFormat::RGBA16u => vk::Format::R16G16B16A16_UINT,
-        VertexAttribFormat::R16f => vk::Format::R16_SFLOAT,
-        VertexAttribFormat::RG16f => vk::Format::R16G16_SFLOAT,
-        VertexAttribFormat::RGB16f => vk::Format::R16G16B16_SFLOAT,
-        VertexAttribFormat::RGBA16f => vk::Format::R16G16B16A16_SFLOAT,
-        VertexAttribFormat::R32i => vk::Format::R32_SINT,
-        VertexAttribFormat::RG32i => vk::Format::R32G32_SINT,
-        VertexAttribFormat::RGBA32i => vk::Format::R32G32B32A32_SINT,
-        VertexAttribFormat::RGB32i => vk::Format::R32G32B32_SINT,
-        VertexAttribFormat::R32u => vk::Format::R32_UINT,
-        VertexAttribFormat::RG32u => vk::Format::R32G32_UINT,
-        VertexAttribFormat::RGB32u => vk::Format::R32G32B32_UINT,
-        VertexAttribFormat::RGBA32u => vk::Format::R32G32B32A32_UINT,
-        VertexAttribFormat::R32f => vk::Format::R32_SFLOAT,
-        VertexAttribFormat::RG32f => vk::Format::R32G32_SFLOAT,
-        VertexAttribFormat::RGB32f => vk::Format::R32G32B32_SFLOAT,
-        VertexAttribFormat::RGBA32f => vk::Format::R32G32B32A32_SFLOAT,
-        _ => vk::Format::R8_SNORM,
+        VertexAttribFormat::R8inorm => Ok(vk::Format::R8_SNORM),
+        VertexAttribFormat::RG8inorm => Ok(vk::Format::R8G8_SNORM),
+        VertexAttribFormat::RGB8inorm => Ok(vk::Format::R8G8B8_SNORM),
+        VertexAttribFormat::RGBA8inorm => Ok(vk::Format::R8G8B8A8_SNORM),
+        VertexAttribFormat::R8unorm => Ok(vk::Format::R8_UNORM),
+        VertexAttribFormat::RG8unorm => Ok(vk::Format::R8G8_UNORM),
+        VertexAttribFormat::RGB8unorm => Ok(vk::Format::R8G8B8_UNORM),
+        VertexAttribFormat::RGBA8unorm => Ok(vk::Format::R8G8B8A8_UNORM),
+        VertexAttribFormat::R16i => Ok(vk::Format::R16_SINT),
+        VertexAttribFormat::RG16i => Ok(vk::Format::R16G16_SINT),
+        VertexAttribFormat::RGB16i => Ok(vk::Format::R16G16B16_SINT),
+        VertexAttribFormat::RGBA16i => Ok(vk::Format::R16G16B16A16_SINT),
+        VertexAttribFormat::R16u => Ok(vk::Format::R16_UINT),
+        VertexAttribFormat::RG16u => Ok(vk::Format::R16G16_UINT),
+        VertexAttribFormat::RGB16u => Ok(vk::Format::R16G16B16_UINT),
+        VertexAttribFormat::RGBA16u => Ok(vk::Format::R16G16B16A16_UINT),
+        VertexAttribFormat::R16f => Ok(vk::Format::R16_SFLOAT),
+        VertexAttribFormat::RG16f => Ok(vk::Format::R16G16_SFLOAT),
+        VertexAttribFormat::RGB16f => Ok(vk::Format::R16G16B16_SFLOAT),
+        VertexAttribFormat::RGBA16f => Ok(vk::Format::R16G16B16A16_SFLOAT),
+        VertexAttribFormat::R32i => Ok(vk::Format::R32_SINT),
+        VertexAttribFormat::RG32i => Ok(vk::Format::R32G32_SINT),
+        VertexAttribFormat::RGBA32i => Ok(vk::Format::R32G32B32A32_SINT),
+        VertexAttribFormat::RGB32i => Ok(vk::Format::R32G32B32_SINT),
+        VertexAttribFormat::R32u => Ok(vk::Format::R32_UINT),
+        VertexAttribFormat::RG32u => Ok(vk::Format::R32G32_UINT),
+        VertexAttribFormat::RGB32u => Ok(vk::Format::R32G32B32_UINT),
+        VertexAttribFormat::RGBA32u => Ok(vk::Format::R32G32B32A32_UINT),
+        VertexAttribFormat::R32f => Ok(vk::Format::R32_SFLOAT),
+        VertexAttribFormat::RG32f => Ok(vk::Format::R32G32_SFLOAT),
+        VertexAttribFormat::RGB32f => Ok(vk::Format::R32G32B32_SFLOAT),
+        VertexAttribFormat::RGBA32f => Ok(vk::Format::R32G32B32A32_SFLOAT),
+        _ => Err(VEVertexAttributesError::InvalidFormat),
     }
 }
 
@@ -139,20 +148,21 @@ fn is_offset(attrib: &VertexAttribFormat) -> bool {
 
 pub fn create_vertex_input_state_descriptions(
     attribs: &[VertexAttribFormat],
-) -> (
-    vk::VertexInputBindingDescription,
-    Vec<vk::VertexInputAttributeDescription>,
-) {
+) -> Result<
+    (
+        vk::VertexInputBindingDescription,
+        Vec<vk::VertexInputAttributeDescription>,
+    ),
+    VEVertexAttributesError,
+> {
     let stride: u32 = attribs
         .iter()
         .map(|a| get_vertex_attribute_type_byte_size(a))
         .sum();
 
-    println!("stride: {stride}");
-
-    if (stride % 4 != 0) {
-        panic!("Stride not dividable by 4");
-    }
+    // if (stride % 4 != 0) {
+    //     panic!("Stride not dividable by 4");
+    // }
 
     let binding_desc = vk::VertexInputBindingDescription::default()
         .stride(stride)
@@ -168,16 +178,12 @@ pub fn create_vertex_input_state_descriptions(
             let desc = vk::VertexInputAttributeDescription::default()
                 .binding(0)
                 .location(location)
-                .format(resolve_vertex_attribute_format(attrib))
+                .format(resolve_vertex_attribute_format(attrib)?)
                 .offset(offset);
-            println!(
-                "location: {location} offset {offset} format {:?}",
-                resolve_vertex_attribute_format(attrib)
-            );
             descriptions.push(desc);
             location += 1;
         }
         offset += get_vertex_attribute_type_byte_size(attrib);
     }
-    (binding_desc, descriptions)
+    Ok((binding_desc, descriptions))
 }

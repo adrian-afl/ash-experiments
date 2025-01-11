@@ -5,7 +5,20 @@ use crate::core::semaphore::VESemaphore;
 use crate::graphics::render_stage::VERenderStage;
 use crate::image::image::VEImage;
 use crate::window::swapchain::VESwapchain;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VESchedulerError {
+    #[error("layer locking failed")]
+    LayerLockingFailed,
+
+    #[error("item locking failed")]
+    ItemLockingFailed,
+
+    #[error("swapchain locking failed")]
+    SwapchainLockingFailed,
+}
 
 struct BlitStage {
     pub source: Arc<VEImage>,
@@ -73,29 +86,48 @@ impl VEScheduler {
         }))
     }
 
-    pub fn set_layer(&mut self, index: u8, items: Vec<Arc<Mutex<ScheduleItem>>>) {
-        self.layers[index as usize].lock().unwrap().items = items;
+    pub fn set_layer(
+        &mut self,
+        index: u8,
+        items: Vec<Arc<Mutex<ScheduleItem>>>,
+    ) -> Result<(), VESchedulerError> {
+        self.layers[index as usize]
+            .lock()
+            .map_err(|_| VESchedulerError::LayerLockingFailed)?
+            .items = items;
+        Ok(())
     }
 
-    pub fn run(&mut self) {
-        let mut swapchain = self.swapchain.lock().unwrap();
+    pub fn run(&mut self) -> Result<(), VESchedulerError> {
+        let mut swapchain = self
+            .swapchain
+            .lock()
+            .map_err(|_| VESchedulerError::SwapchainLockingFailed)?;
         let blit_semaphore = &swapchain.blit_done_semaphore;
 
-        let non_empty_layers: Vec<&Arc<Mutex<ScheduleLayer>>> = self
-            .layers
-            .iter()
-            .filter(|l| l.lock().unwrap().items.len() > 0)
-            .collect();
+        let mut non_empty_layers: Vec<&Arc<Mutex<ScheduleLayer>>> = vec![];
+        for i in 0..self.layers.len() {
+            let layer = self.layers[i]
+                .lock()
+                .map_err(|_| VESchedulerError::LayerLockingFailed)?;
+            if (layer.items.len() > 0) {
+                non_empty_layers.push(&self.layers[i]);
+            }
+        }
 
         let mut layer_semaphores: Vec<Vec<Arc<Mutex<VESemaphore>>>> = vec![];
         for i in 0..non_empty_layers.len() {
             layer_semaphores.push(vec![]);
         }
         for i in 0..non_empty_layers.len() {
-            let layer = non_empty_layers[i].lock().unwrap();
+            let layer = non_empty_layers[i]
+                .lock()
+                .map_err(|_| VESchedulerError::LayerLockingFailed)?;
             let items = &layer.items;
             for g in 0..layer.items.len() {
-                let item = items[g].lock().unwrap();
+                let item = items[g]
+                    .lock()
+                    .map_err(|_| VESchedulerError::ItemLockingFailed)?;
                 let item_semaphore = item.semaphore.clone();
                 match item.stage {
                     Stage::Compute(_) => layer_semaphores[i].push(item_semaphore),
@@ -108,28 +140,22 @@ impl VEScheduler {
             }
         }
 
-        non_empty_layers.iter().enumerate().for_each(|(i, layer)| {
+        for i in 0..non_empty_layers.len() {
             // println!("LAYER {i}");
-            let mut layer = layer.lock().unwrap();
+            let mut layer = self.layers[i]
+                .lock()
+                .map_err(|_| VESchedulerError::LayerLockingFailed)?;
             let previous_i = if i == 0 {
                 non_empty_layers.len() - 1
             } else {
                 i - 1
             };
 
-            // let mut previous_semaphores: Vec<MutexGuard<VESemaphore>> = layer_semaphores[previous_i]
-            //     .iter()
-            //     .map(|x| {
-            //         let locked = x.lock().unwrap();
-            //         locked
-            //     })
-            //     .collect();
-            // let previous_semaphores = previous_semaphores.as_mut_slice();
-            // // let current_semaphores = &layer_semaphores[i];
-
             let items = &layer.items;
             for h in 0..items.len() {
-                let item = items[h].lock().unwrap();
+                let item = items[h]
+                    .lock()
+                    .map_err(|_| VESchedulerError::ItemLockingFailed)?;
                 // println!("ITEM {}", item.name);
                 match &item.stage {
                     Stage::Compute(stage) => {
@@ -163,6 +189,8 @@ impl VEScheduler {
                     }
                 }
             }
-        });
+        }
+
+        Ok(())
     }
 }

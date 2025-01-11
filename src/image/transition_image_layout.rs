@@ -2,6 +2,7 @@ use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::image::image::VEImageError;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
 use std::sync::Arc;
@@ -14,21 +15,21 @@ pub fn transition_image_layout(
     aspect: vk::ImageAspectFlags,
     current_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
-) {
+) -> Result<(), VEImageError> {
     let mut src_access = vk::AccessFlags::empty();
     let mut dst_access = vk::AccessFlags::empty();
-    let mut source_stage = vk::PipelineStageFlags::empty();
-    let mut destination_stage = vk::PipelineStageFlags::empty();
+    let source_stage;
+    let destination_stage;
 
-    if (current_layout == vk::ImageLayout::UNDEFINED
-        && new_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+    if current_layout == vk::ImageLayout::UNDEFINED
+        && new_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
     {
         dst_access = vk::AccessFlags::TRANSFER_WRITE;
 
         source_stage = vk::PipelineStageFlags::TOP_OF_PIPE;
         destination_stage = vk::PipelineStageFlags::TRANSFER;
-    } else if (current_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
-        && new_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+    } else if current_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
+        && new_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
     {
         src_access = vk::AccessFlags::TRANSFER_WRITE;
         dst_access = vk::AccessFlags::SHADER_READ;
@@ -38,7 +39,7 @@ pub fn transition_image_layout(
     } else {
         source_stage = vk::PipelineStageFlags::ALL_COMMANDS;
         destination_stage = vk::PipelineStageFlags::ALL_COMMANDS;
-        match (current_layout) {
+        match current_layout {
             vk::ImageLayout::PREINITIALIZED => src_access = vk::AccessFlags::HOST_WRITE,
 
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
@@ -57,7 +58,7 @@ pub fn transition_image_layout(
 
             _ => (),
         }
-        match (new_layout) {
+        match new_layout {
             vk::ImageLayout::TRANSFER_DST_OPTIMAL => dst_access = vk::AccessFlags::TRANSFER_WRITE,
 
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL => dst_access = vk::AccessFlags::TRANSFER_READ,
@@ -74,7 +75,7 @@ pub fn transition_image_layout(
                 if src_access == vk::AccessFlags::empty() {
                     src_access = vk::AccessFlags::HOST_WRITE | vk::AccessFlags::TRANSFER_WRITE;
                 }
-                if (current_layout == vk::ImageLayout::TRANSFER_SRC_OPTIMAL) {
+                if current_layout == vk::ImageLayout::TRANSFER_SRC_OPTIMAL {
                     src_access = vk::AccessFlags::TRANSFER_READ;
                 }
                 dst_access = vk::AccessFlags::SHADER_READ;
@@ -83,9 +84,9 @@ pub fn transition_image_layout(
         }
     }
 
-    let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone());
+    let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone())?;
     //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-    command_buffer.begin(CommandBufferUsageFlags::empty());
+    command_buffer.begin(CommandBufferUsageFlags::empty())?;
 
     image_memory_barrier(
         device,
@@ -100,10 +101,12 @@ pub fn transition_image_layout(
         destination_stage,
     );
 
-    command_buffer.end();
+    command_buffer.end()?;
 
-    command_buffer.submit(&queue, vec![], vec![]);
-    queue.wait_idle();
+    command_buffer.submit(&queue, vec![], vec![])?;
+    queue.wait_idle()?;
+
+    Ok(())
 }
 
 fn image_memory_barrier(
@@ -128,7 +131,7 @@ fn image_memory_barrier(
             vk::ImageSubresourceRange::default()
                 .aspect_mask(aspect)
                 .base_mip_level(0)
-                .level_count(1) // TODO MIPMAPPING
+                .level_count(1) // TODO mip mapping
                 .base_array_layer(0)
                 .layer_count(1),
         )

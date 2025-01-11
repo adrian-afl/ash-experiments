@@ -1,6 +1,13 @@
 use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEMainDeviceQueueError {
+    #[error("queue wait idle failed")]
+    QueueWaitIdleFailed(#[source] vk::Result),
+}
 
 #[derive(Debug)]
 pub struct VEMainDeviceQueue {
@@ -16,7 +23,13 @@ impl VEMainDeviceQueue {
         }
     }
 
-    pub fn wait_idle(&self) {
-        unsafe { self.device.device.queue_wait_idle(self.main_queue).unwrap() }
+    pub fn wait_idle(&self) -> Result<(), VEMainDeviceQueueError> {
+        unsafe {
+            self.device
+                .device
+                .queue_wait_idle(self.main_queue)
+                .map_err(VEMainDeviceQueueError::QueueWaitIdleFailed)?
+        }
+        Ok(())
     }
 }

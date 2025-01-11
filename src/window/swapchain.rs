@@ -1,8 +1,8 @@
-use crate::core::command_buffer::VECommandBuffer;
+use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
-use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::core::semaphore::{SemaphoreState, VESemaphore};
+use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
+use crate::core::semaphore::{SemaphoreState, VESemaphore, VESemaphoreError};
 use crate::image::image::VEImage;
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::window::VEWindow;
@@ -16,8 +16,21 @@ use ash::vk::{
 use std::fmt::{Debug, Formatter};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 use tracing::{event, instrument, Level};
 use winit::dpi::PhysicalSize;
+
+#[derive(Error, Debug)]
+pub enum VESwapchainError {
+    #[error("no winit window found")]
+    NoWinitWindowFound,
+
+    #[error("semaphore error")]
+    SemaphoreError(#[from] VESemaphoreError),
+
+    #[error("command buffer error")]
+    CommandBufferError(#[from] VECommandBufferError),
+}
 
 pub struct VESwapchain {
     device: Arc<VEDevice>,
@@ -50,8 +63,11 @@ impl VESwapchain {
         main_device_queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
-    ) -> VESwapchain {
-        let winit_window = window.window.as_ref().unwrap();
+    ) -> Result<VESwapchain, VESwapchainError> {
+        let winit_window = window
+            .window
+            .as_ref()
+            .ok_or(VESwapchainError::NoWinitWindowFound)?;
 
         let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
             device.clone(),
@@ -61,22 +77,26 @@ impl VESwapchain {
             winit_window.inner_size(),
         );
 
-        VESwapchain {
+        let acquire_ready_semaphore = VESemaphore::new(device.clone())?;
+        let blit_done_semaphore = VESemaphore::new(device.clone())?;
+        let present_command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone())?;
+
+        Ok(VESwapchain {
             device: device.clone(),
             swapchain,
             swapchain_loader,
             present_images,
             main_device_queue,
-            command_pool: command_pool.clone(),
+            command_pool,
             memory_manager,
 
             width: winit_window.inner_size().width,
             height: winit_window.inner_size().height,
 
-            acquire_ready_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
-            blit_done_semaphore: Arc::new(Mutex::from(VESemaphore::new(device.clone()))),
-            present_command_buffer: VECommandBuffer::new(device.clone(), command_pool),
-        }
+            acquire_ready_semaphore: Arc::new(Mutex::from(acquire_ready_semaphore)),
+            blit_done_semaphore: Arc::new(Mutex::from(blit_done_semaphore)),
+            present_command_buffer,
+        })
     }
 
     fn create_swapchain_images(
@@ -87,7 +107,7 @@ impl VESwapchain {
         new_size: PhysicalSize<u32>,
     ) -> (SwapchainKHR, swapchain::Device, Vec<VEImage>) {
         let swapchain_loader = swapchain::Device::new(&device.instance, &device.device);
-        // let winit_window = window.window.as_ref().unwrap();
+
         let surface_format = unsafe {
             device
                 .surface_loader

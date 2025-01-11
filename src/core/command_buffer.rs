@@ -7,8 +7,6 @@ use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandBufferUsageFlags,
     PipelineStageFlags,
 };
-use std::fs::File;
-use std::io::Read;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tracing::{event, Level};
@@ -16,7 +14,22 @@ use tracing::{event, Level};
 #[derive(Error, Debug)]
 pub enum VECommandBufferError {
     #[error("creation failed")]
-    CreationFailed(#[from] vk::Result),
+    CreationFailed(#[source] vk::Result),
+
+    #[error("begin failed")]
+    BeginFailed(#[source] vk::Result),
+
+    #[error("end failed")]
+    EndFailed(#[source] vk::Result),
+
+    #[error("submit failed")]
+    SubmitFailed(#[source] vk::Result),
+
+    #[error("semaphore locking failed")]
+    SemaphoreLockingFailed,
+
+    #[error("waiting for awaited semaphore")]
+    WaitingForAwaitedSemaphore,
 }
 
 pub struct VECommandBuffer {
@@ -31,12 +44,15 @@ impl VECommandBuffer {
         command_pool: Arc<VECommandPool>,
     ) -> Result<VECommandBuffer, VECommandBufferError> {
         let handle = unsafe {
-            device.device.allocate_command_buffers(
-                &CommandBufferAllocateInfo::default()
-                    .level(CommandBufferLevel::PRIMARY)
-                    .command_buffer_count(1)
-                    .command_pool(command_pool.handle),
-            )?[0]
+            device
+                .device
+                .allocate_command_buffers(
+                    &CommandBufferAllocateInfo::default()
+                        .level(CommandBufferLevel::PRIMARY)
+                        .command_buffer_count(1)
+                        .command_pool(command_pool.handle),
+                )
+                .map_err(VECommandBufferError::CreationFailed)?[0]
         };
         Ok(VECommandBuffer {
             device: device.clone(),
@@ -45,7 +61,7 @@ impl VECommandBuffer {
         })
     }
 
-    pub fn begin(&self, flags: CommandBufferUsageFlags) {
+    pub fn begin(&self, flags: CommandBufferUsageFlags) -> Result<(), VECommandBufferError> {
         let begin_info = vk::CommandBufferBeginInfo::default()
             .flags(flags | CommandBufferUsageFlags::SIMULTANEOUS_USE);
 
@@ -53,14 +69,20 @@ impl VECommandBuffer {
             self.device
                 .device
                 .begin_command_buffer(self.handle, &begin_info)
-                .unwrap();
+                .map_err(VECommandBufferError::BeginFailed)?;
         }
+
+        Ok(())
     }
 
-    pub fn end(&self) {
+    pub fn end(&self) -> Result<(), VECommandBufferError> {
         unsafe {
-            self.device.device.end_command_buffer(self.handle).unwrap();
+            self.device
+                .device
+                .end_command_buffer(self.handle)
+                .map_err(VECommandBufferError::EndFailed)?;
         }
+        Ok(())
     }
 
     pub fn submit(
@@ -68,68 +90,45 @@ impl VECommandBuffer {
         queue: &VEMainDeviceQueue,
         wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
         signal_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
-    ) {
-        let wait_handles: Vec<vk::Semaphore> = wait_for_semaphores
-            .iter()
-            .filter(|x| {
-                let x = x.lock().unwrap();
-                match x.state {
-                    SemaphoreState::Fresh => false,
-                    SemaphoreState::Pending => true,
-                    SemaphoreState::Awaited => panic!("Waiting for awaited semaphore"),
+    ) -> Result<(), VECommandBufferError> {
+        let mut wait_handles: Vec<vk::Semaphore> = vec![];
+        let mut wait_masks: Vec<PipelineStageFlags> = vec![];
+        for x in wait_for_semaphores {
+            let mut x = x
+                .lock()
+                .map_err(|_| VECommandBufferError::SemaphoreLockingFailed)?;
+            let should = match x.state {
+                SemaphoreState::Fresh => Ok(false),
+                SemaphoreState::Pending => Ok(true),
+                SemaphoreState::Awaited => Err(VECommandBufferError::WaitingForAwaitedSemaphore),
+            }?;
+            if should {
+                wait_handles.push(x.handle);
+                wait_masks.push(
+                    PipelineStageFlags::ALL_COMMANDS
+                        | PipelineStageFlags::ALL_GRAPHICS
+                        | PipelineStageFlags::COMPUTE_SHADER,
+                );
+                if x.state == SemaphoreState::Pending {
+                    event!(Level::TRACE, "Setting semaphore to Awaited");
+                    x.state = SemaphoreState::Awaited;
                 }
-            })
-            .map(|mut x| {
-                let x = x.lock().unwrap();
-                x.handle
-            })
-            .collect();
-
-        let wait_masks: Vec<PipelineStageFlags> = wait_for_semaphores
-            .iter()
-            .filter(|x| {
-                let x = x.lock().unwrap();
-                match x.state {
-                    SemaphoreState::Fresh => false,
-                    SemaphoreState::Pending => true,
-                    SemaphoreState::Awaited => panic!("Waiting for awaited semaphore"),
-                }
-            })
-            .map(|_| {
-                PipelineStageFlags::ALL_COMMANDS
-                    | PipelineStageFlags::ALL_GRAPHICS
-                    | PipelineStageFlags::COMPUTE_SHADER
-            })
-            .collect();
-
-        for semaphore in wait_for_semaphores.iter() {
-            let mut semaphore = semaphore.lock().unwrap();
-            if (semaphore).state == SemaphoreState::Pending {
-                event!(Level::TRACE, "Setting semaphore to Awaited");
-                (semaphore).state = SemaphoreState::Awaited;
             }
         }
 
-        let signal_handles: Vec<vk::Semaphore> = signal_semaphores
-            .iter()
-            .map(|mut x| {
-                let x = x.lock().unwrap();
-                x.handle
-            })
-            .collect();
+        let mut signal_handles: Vec<vk::Semaphore> = vec![];
 
-        for mut semaphore in signal_semaphores.iter() {
-            let mut semaphore = semaphore.lock().unwrap();
+        for x in signal_semaphores {
+            let mut x = x
+                .lock()
+                .map_err(|_| VECommandBufferError::SemaphoreLockingFailed)?;
+            signal_handles.push(x.handle);
             event!(Level::TRACE, "Setting semaphore to Pending");
-            (semaphore).state = SemaphoreState::Pending;
+            x.state = SemaphoreState::Pending;
         }
 
         let command_buffer_handles = [self.handle];
 
-        // println!(
-        //     "SUBMIT Wait For {:?}, Signal {:?}",
-        //     wait_handles, signal_handles
-        // );
         let submit_info = vk::SubmitInfo::default()
             .signal_semaphores(&signal_handles)
             .wait_semaphores(&wait_handles)
@@ -140,8 +139,9 @@ impl VECommandBuffer {
             self.device
                 .device
                 .queue_submit(queue.main_queue, &[submit_info], vk::Fence::null())
-                .unwrap();
+                .map_err(VECommandBufferError::SubmitFailed)?;
         }
+        Ok(())
     }
 }
 

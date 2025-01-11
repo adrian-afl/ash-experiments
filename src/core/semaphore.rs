@@ -1,6 +1,13 @@
 use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VESemaphoreError {
+    #[error("creation failed")]
+    CreationFailed(#[from] vk::Result),
+}
 
 #[derive(Debug, PartialEq)]
 pub enum SemaphoreState {
@@ -17,24 +24,26 @@ pub struct VESemaphore {
 }
 
 impl VESemaphore {
-    pub fn new(device: Arc<VEDevice>) -> VESemaphore {
+    pub fn new(device: Arc<VEDevice>) -> Result<VESemaphore, VESemaphoreError> {
         let info = vk::SemaphoreCreateInfo::default();
-        let handle = unsafe { device.device.create_semaphore(&info, None).unwrap() };
+        let handle = unsafe { device.device.create_semaphore(&info, None)? };
 
-        VESemaphore {
+        Ok(VESemaphore {
             device,
             handle,
             state: SemaphoreState::Fresh,
-        }
+        })
     }
 
-    pub fn recreate(&mut self) {
+    pub fn recreate(&mut self) -> Result<(), VESemaphoreError> {
         unsafe {
             self.device.device.destroy_semaphore(self.handle, None);
             let info = vk::SemaphoreCreateInfo::default();
-            self.handle = self.device.device.create_semaphore(&info, None).unwrap();
+            self.handle = self.device.device.create_semaphore(&info, None)?;
             self.state = SemaphoreState::Fresh;
         }
+
+        Ok(())
     }
 }
 

@@ -4,6 +4,13 @@ use ash::vk;
 use ash::vk::ShaderModuleCreateInfo;
 use std::io;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEShaderModuleError {
+    #[error("creation failed")]
+    CreationFailed(#[from] vk::Result),
+}
 
 pub enum VEShaderModuleType {
     Vertex,
@@ -22,16 +29,16 @@ impl VEShaderModule {
         device: Arc<VEDevice>,
         stream: &mut R,
         typ: VEShaderModuleType,
-    ) -> VEShaderModule {
+    ) -> Result<VEShaderModule, VEShaderModuleError> {
         let spirv = read_spv(stream).unwrap();
         let info = ShaderModuleCreateInfo::default().code(&spirv);
-        let handle = unsafe { device.device.create_shader_module(&info, None).unwrap() };
+        let handle = unsafe { device.device.create_shader_module(&info, None)? };
 
-        VEShaderModule {
+        Ok(VEShaderModule {
             device,
             handle,
             typ,
-        }
+        })
     }
 }
 

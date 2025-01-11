@@ -2,7 +2,7 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::memory_properties::VEMemoryProperties;
-use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::VEImageFormat;
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
@@ -17,7 +17,7 @@ impl VEImage {
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,
         usages: &[VEImageUsage],
-    ) -> VEImage {
+    ) -> Result<VEImage, VEImageError> {
         let img = ImageReader::open(path).unwrap().decode().unwrap();
         let img = img.to_rgba8(); // error handling... TODO
                                   // let format = match img.color() {

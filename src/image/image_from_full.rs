@@ -3,7 +3,7 @@ use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
 use crate::image::aspect_from_format::aspect_from_format;
-use crate::image::image::{VEImage, VEImageUsage};
+use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::{get_image_format, VEImageFormat};
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
@@ -42,7 +42,7 @@ impl VEImage {
         usages: &[VEImageUsage],
 
         memory_properties: Option<VEMemoryProperties>,
-    ) -> VEImage {
+    ) -> Result<VEImage, VEImageError> {
         let format = get_image_format(format);
         let aspect = aspect_from_format(format);
 
@@ -74,7 +74,7 @@ impl VEImage {
             device
                 .device
                 .create_image(&image_create_info, None)
-                .unwrap()
+                .map_err(VEImageError::ImageCreationFailed)?
         };
 
         let mem_reqs = unsafe { device.device.get_image_memory_requirements(image_handle) };
@@ -83,11 +83,12 @@ impl VEImage {
             get_memory_properties_flags(memory_properties),
         );
 
-        let allocation = {
-            memory_manager
+        let allocation = match mem_index {
+            None => return Err(VEImageError::NoSuitableMemoryTypeFound),
+            Some(mem_index) => memory_manager
                 .lock()
-                .unwrap()
-                .bind_image_memory(mem_index, image_handle, mem_reqs.size)
+                .map_err(|_| VEImageError::MemoryManagerLockingFailed)?
+                .bind_image_memory(mem_index, image_handle, mem_reqs.size)?,
         };
 
         let image_view_create_info = vk::ImageViewCreateInfo::default()
@@ -102,7 +103,7 @@ impl VEImage {
                 vk::ImageSubresourceRange::default()
                     .aspect_mask(aspect)
                     .base_mip_level(0)
-                    .level_count(1) // TODO MIPMAPPING
+                    .level_count(1) // TODO mip mapping
                     .base_array_layer(0)
                     .layer_count(1),
             )
@@ -112,11 +113,12 @@ impl VEImage {
                 b: vk::ComponentSwizzle::IDENTITY,
                 a: vk::ComponentSwizzle::IDENTITY,
             });
+
         let image_view_handle = unsafe {
             device
                 .device
                 .create_image_view(&image_view_create_info, None)
-                .unwrap()
+                .map_err(VEImageError::ImageViewCreationFailed)?
         };
 
         let mut image = VEImage {
@@ -140,6 +142,6 @@ impl VEImage {
         };
         image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL);
 
-        image
+        Ok(image)
     }
 }

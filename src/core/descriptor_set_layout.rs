@@ -1,7 +1,8 @@
-use crate::core::descriptor_set::VEDescriptorSet;
+use crate::core::descriptor_set::{VEDescriptorSet, VEDescriptorSetError};
 use crate::core::device::VEDevice;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
 
 pub enum VEDescriptorSetFieldStage {
     All,
@@ -31,13 +32,28 @@ pub struct VEDescriptorSetLayoutField {
     pub stage: VEDescriptorSetFieldStage,
 }
 
+#[derive(Error, Debug)]
+pub enum VEDescriptorSetLayoutError {
+    #[error("creation failed")]
+    CreationFailed(#[source] vk::Result),
+
+    #[error("pool creation failed")]
+    PoolCreationFailed(#[source] vk::Result),
+
+    #[error("no pool found")]
+    NoPoolFound,
+
+    #[error("descriptor set creation failed")]
+    DescriptorSetCreationFailed(#[source] VEDescriptorSetError),
+}
+
 static DEFAULT_POOL_SIZE: u32 = 256;
 
 impl VEDescriptorSetLayout {
     pub fn new(
         device: Arc<VEDevice>,
         fields: &[VEDescriptorSetLayoutField],
-    ) -> VEDescriptorSetLayout {
+    ) -> Result<VEDescriptorSetLayout, VEDescriptorSetLayoutError> {
         let mut bindings = vec![];
         for field in fields {
             let typ = match field.typ {
@@ -68,32 +84,36 @@ impl VEDescriptorSetLayout {
             device
                 .device
                 .create_descriptor_set_layout(&info, None)
-                .unwrap()
+                .map_err(VEDescriptorSetLayoutError::CreationFailed)?
         };
 
-        VEDescriptorSetLayout {
+        Ok(VEDescriptorSetLayout {
             device,
             layout,
             pools: vec![],
             allocation_counter: 0,
-        }
+        })
     }
 
-    pub fn create_descriptor_set(&mut self) -> VEDescriptorSet {
-        if (self.pools.len() == 0) {
-            self.generate_new_set_pool();
+    pub fn create_descriptor_set(&mut self) -> Result<VEDescriptorSet, VEDescriptorSetLayoutError> {
+        if self.pools.len() == 0 {
+            self.generate_new_set_pool()?;
         } else {
             self.allocation_counter += 1;
-            if (self.allocation_counter >= DEFAULT_POOL_SIZE) {
-                self.generate_new_set_pool();
+            if self.allocation_counter >= DEFAULT_POOL_SIZE {
+                self.generate_new_set_pool()?;
                 self.allocation_counter = 0;
             }
         }
-        let pool = self.pools.last().unwrap();
+        let pool = self
+            .pools
+            .last()
+            .ok_or_else(|| VEDescriptorSetLayoutError::NoPoolFound)?;
         VEDescriptorSet::new(self.device.clone(), self.layout, pool)
+            .map_err(VEDescriptorSetLayoutError::DescriptorSetCreationFailed)
     }
 
-    pub fn generate_new_set_pool(&mut self) {
+    pub fn generate_new_set_pool(&mut self) -> Result<(), VEDescriptorSetLayoutError> {
         let pool_sizes = [
             vk::DescriptorPoolSize::default()
                 .ty(vk::DescriptorType::UNIFORM_BUFFER)
@@ -115,9 +135,10 @@ impl VEDescriptorSetLayout {
             self.device
                 .device
                 .create_descriptor_pool(&info, None)
-                .unwrap()
+                .map_err(VEDescriptorSetLayoutError::PoolCreationFailed)?
         };
         self.pools.push(Arc::new(pool));
+        Ok(())
     }
 }
 

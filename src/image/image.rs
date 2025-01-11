@@ -1,12 +1,16 @@
+use crate::buffer::buffer::VEBufferError;
+use crate::core::command_buffer::VECommandBufferError;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
-use crate::core::main_device_queue::VEMainDeviceQueue;
+use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::image::transition_image_layout::transition_image_layout;
-use crate::memory::memory_chunk::VESingleAllocation;
-use crate::memory::memory_manager::VEMemoryManager;
+use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
+use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
 use std::fmt::{Debug, Formatter};
+use std::io;
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 
 #[path = "./image_from_data.rs"]
 mod image_from_data;
@@ -16,6 +20,39 @@ mod image_from_file;
 mod image_from_full;
 #[path = "./image_from_swapchain.rs"]
 mod image_from_swapchain;
+
+#[derive(Error, Debug)]
+pub enum VEImageError {
+    #[error("image creation failed")]
+    ImageCreationFailed(#[source] vk::Result),
+
+    #[error("image view creation failed")]
+    ImageViewCreationFailed(#[source] vk::Result),
+
+    #[error("buffer error")]
+    BufferError(#[from] VEBufferError),
+
+    #[error("memory manager error")]
+    MemoryManagerError(#[from] VEMemoryManagerError),
+
+    #[error("memory chunk error")]
+    MemoryChunkError(#[from] VEMemoryChunkError),
+
+    #[error("command buffer error")]
+    CommandBufferError(#[from] VECommandBufferError),
+
+    #[error("main device query error")]
+    MainDeviceQueueError(#[from] VEMainDeviceQueueError),
+
+    #[error("opening file failed")]
+    OpeningFileFailed(#[source] io::Error),
+
+    #[error("memory manager locking failed")]
+    MemoryManagerLockingFailed,
+
+    #[error("no suitable memory type found")]
+    NoSuitableMemoryTypeFound,
+}
 
 #[derive(Debug, Clone)]
 pub enum VEImageUsage {

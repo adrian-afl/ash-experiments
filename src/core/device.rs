@@ -14,8 +14,48 @@ use std::ffi;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::os::raw::c_char;
+use thiserror::Error;
 use tracing::{event, trace, Level};
-use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use winit::raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
+
+#[derive(Error, Debug)]
+pub enum VEDeviceError {
+    #[error("no winit window found")]
+    NoWinitWindowFound,
+
+    #[error("no winit display handle")]
+    NoWinitDisplayHandle(#[source] HandleError),
+
+    #[error("no winit window handle")]
+    NoWinitWindowHandle(#[source] HandleError),
+
+    #[error("cannot enumerate required window extensions")]
+    CannotEnumerateRequiredWindowExtensions(#[source] vk::Result),
+
+    #[error("cannot create debug utils messenger")]
+    CannotCreateDebugUtilsMessenger(#[source] vk::Result),
+
+    #[error("cannot create instance")]
+    CannotCreateInstance(#[source] vk::Result),
+
+    #[error("cannot enumerate physical devices")]
+    CannotEnumeratePhysicalDevices(#[source] vk::Result),
+
+    #[error("no suitable physical device found")]
+    NoSuitablePhysicalDeviceFound,
+
+    #[error("cannot get physical device surface support")]
+    CannotGetPhysicalDeviceSurfaceSupport(#[source] vk::Result),
+
+    #[error("cannot create surface")]
+    CannotCreateSurface(#[source] vk::Result),
+
+    #[error("cannot create device")]
+    CannotCreateDevice(#[source] vk::Result),
+
+    #[error("device wait idle failed")]
+    DeviceWaitIdleFailed(#[source] vk::Result),
+}
 
 pub struct VEDevice {
     pub instance: Instance,
@@ -62,8 +102,8 @@ unsafe extern "system" fn vulkan_debug_callback(
 }
 
 impl VEDevice {
-    pub fn new(window: &VEWindow) -> VEDevice {
-        let app_name = c"planetdraw-rs";
+    pub fn new(window: &VEWindow) -> Result<VEDevice, VEDeviceError> {
+        let app_name = c"vengine-rs";
 
         let layer_names = [c"VK_LAYER_KHRONOS_validation"];
         let layers_names_raw: Vec<*const c_char> = layer_names
@@ -71,13 +111,22 @@ impl VEDevice {
             .map(|raw_name| raw_name.as_ptr())
             .collect();
 
-        let winit_window = window.window.as_ref().unwrap();
+        let winit_window = window
+            .window
+            .as_ref()
+            .ok_or(VEDeviceError::NoWinitWindowFound)?;
+        let display_handle = winit_window
+            .display_handle()
+            .map_err(VEDeviceError::NoWinitDisplayHandle)?
+            .as_raw();
+        let window_handle = winit_window
+            .window_handle()
+            .map_err(VEDeviceError::NoWinitWindowHandle)?
+            .as_raw();
 
-        let mut extension_names = ash_window::enumerate_required_extensions(
-            winit_window.display_handle().unwrap().as_raw(),
-        )
-        .unwrap()
-        .to_vec();
+        let mut extension_names = ash_window::enumerate_required_extensions(display_handle)
+            .map_err(VEDeviceError::CannotEnumerateRequiredWindowExtensions)
+            .to_vec();
         extension_names.push(debug_utils::NAME.as_ptr());
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
@@ -109,13 +158,9 @@ impl VEDevice {
             window
                 .entry
                 .create_instance(&create_info, None)
-                .expect("Instance creation error")
+                .map_err(VEDeviceError::CannotCreateInstance)?
         };
 
-        println!(
-            "vulkan_debug_callback: {:?}",
-            vulkan_debug_callback.type_id()
-        );
         let debug_info = DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(
                 DebugUtilsMessageSeverityFlagsEXT::ERROR
@@ -134,24 +179,24 @@ impl VEDevice {
         unsafe {
             debug_utils_loader
                 .create_debug_utils_messenger(&debug_info, None)
-                .unwrap();
+                .map_err(VEDeviceError::CannotCreateDebugUtilsMessenger)?;
         }
 
         let surface = unsafe {
             ash_window::create_surface(
                 &window.entry,
                 &instance,
-                winit_window.display_handle().unwrap().as_raw(),
-                winit_window.window_handle().unwrap().as_raw(),
+                display_handle,
+                window_handle,
                 None,
             )
-            .unwrap()
+            .map_err(VEDeviceError::CannotCreateSurface)?
         };
 
         let pdevices = unsafe {
             instance
                 .enumerate_physical_devices()
-                .expect("Physical device error")
+                .map_err(VEDeviceError::CannotEnumeratePhysicalDevices)?
         };
 
         let surface_loader = surface::Instance::new(&window.entry, &instance);
@@ -171,7 +216,7 @@ impl VEDevice {
                                         index as u32,
                                         surface,
                                     )
-                                    .unwrap();
+                                    .map_err(VEDeviceError::CannotGetPhysicalDeviceSurfaceSupport);
                         if supports_graphic_and_surface {
                             Some((*pdevice, index))
                         } else {
@@ -179,7 +224,7 @@ impl VEDevice {
                         }
                     })
             })
-            .expect("Couldn't find suitable device.");
+            .ok_or_else(VEDeviceError::NoSuitablePhysicalDeviceFound)?;
 
         let queue_family_index = queue_family_index as u32;
         let device_extension_names_raw = [
@@ -206,13 +251,13 @@ impl VEDevice {
         let device: Device = unsafe {
             instance
                 .create_device(pdevice, &device_create_info, None)
-                .unwrap()
+                .map_err(VEDeviceError::CannotCreateDevice)?
         };
 
         let device_memory_properties =
             unsafe { instance.get_physical_device_memory_properties(pdevice) };
 
-        VEDevice {
+        Ok(VEDevice {
             instance,
             physical_device: pdevice,
             device,
@@ -220,24 +265,31 @@ impl VEDevice {
             surface,
             queue_family_index,
             device_memory_properties,
-        }
+        })
     }
 
-    pub fn find_memory_type(&self, type_filter: u32, properties: MemoryPropertyFlags) -> u32 {
+    pub fn find_memory_type(
+        &self,
+        type_filter: u32,
+        properties: MemoryPropertyFlags,
+    ) -> Option<u32> {
         for i in 0..self.device_memory_properties.memory_type_count {
             let mem_type = self.device_memory_properties.memory_types[i as usize];
             let prop_flags = mem_type.property_flags;
             if (type_filter & (1 << i) > 0 && (prop_flags & properties) == properties) {
-                return i;
+                return Some(i);
             }
         }
 
-        panic!("No suitable memory type found");
+        None
     }
 
-    pub fn wait_idle(&self) {
+    pub fn wait_idle(&self) -> Result<(), VEDeviceError> {
         unsafe {
-            self.device.device_wait_idle().unwrap();
+            self.device
+                .device_wait_idle()
+                .map_err(VEDeviceError::DeviceWaitIdleFailed)?;
         }
+        Ok(())
     }
 }

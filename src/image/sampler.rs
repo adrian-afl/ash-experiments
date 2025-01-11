@@ -2,6 +2,13 @@ use crate::core::device::VEDevice;
 use crate::image::filtering::{get_filtering, VEFiltering};
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VESamplerError {
+    #[error("creation failed")]
+    CreationFailed(#[source] vk::Result),
+}
 
 pub enum VESamplerAddressMode {
     Repeat,
@@ -33,7 +40,7 @@ impl VESampler {
         mag_filter: VEFiltering,
 
         anisotropy: bool,
-    ) -> VESampler {
+    ) -> Result<VESampler, VESamplerError> {
         let sampler_address_mode = get_sampler_address_mode(sampler_address_mode);
         let min_filter = get_filtering(min_filter);
         let mag_filter = get_filtering(mag_filter);
@@ -52,9 +59,14 @@ impl VESampler {
             .max_lod(1.0)
             .mip_lod_bias(0.0);
 
-        let handle = unsafe { device.device.create_sampler(&create_info, None).unwrap() };
+        let handle = unsafe {
+            device
+                .device
+                .create_sampler(&create_info, None)
+                .map_err(VESamplerError::CreationFailed)?
+        };
 
-        VESampler { device, handle }
+        Ok(VESampler { device, handle })
     }
 }
 

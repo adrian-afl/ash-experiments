@@ -2,6 +2,13 @@ use crate::core::device::VEDevice;
 use crate::graphics::attachment::VEAttachment;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VERenderPassError {
+    #[error("creation failed")]
+    CreationFailed(#[from] vk::Result),
+}
 
 pub struct VERenderPass {
     device: Arc<VEDevice>,
@@ -12,9 +19,8 @@ impl VERenderPass {
     pub fn new(
         device: Arc<VEDevice>,
         attachments: &[&VEAttachment],
-    ) -> VERenderPass {
-        let color_attas: Vec<&&VEAttachment> =
-            attachments.iter().filter(|x| !x.is_depth).collect();
+    ) -> Result<VERenderPass, VERenderPassError> {
+        let color_attas: Vec<&&VEAttachment> = attachments.iter().filter(|x| !x.is_depth).collect();
         let depth_atta = attachments.iter().filter(|x| x.is_depth).last();
 
         let color_references: Vec<vk::AttachmentReference> = (0..color_attas.len())
@@ -38,21 +44,17 @@ impl VERenderPass {
             .attachments(&atta_descs)
             .subpasses(&subpasses);
 
-        let handle = unsafe {
-            device
-                .device
-                .create_render_pass(&create_info, None)
-                .unwrap()
-        };
+        let handle = unsafe { device.device.create_render_pass(&create_info, None)? };
 
-        VERenderPass { device, handle }
+        Ok(VERenderPass { device, handle })
     }
 
     fn create_subpass<'a>(
         color_references: &'a [vk::AttachmentReference],
         depth_reference: Option<&'a vk::AttachmentReference>,
     ) -> vk::SubpassDescription<'a> {
-        let mut description = vk::SubpassDescription::default().color_attachments(&color_references);
+        let mut description =
+            vk::SubpassDescription::default().color_attachments(&color_references);
         match depth_reference {
             None => (),
             Some(reference) => description = description.depth_stencil_attachment(reference),
