@@ -114,7 +114,7 @@ impl VEBuffer {
 
 impl Drop for VEBuffer {
     fn drop(&mut self) {
-        let mut locking_result = self.memory_manager.lock();
+        let locking_result = self.memory_manager.lock();
         match locking_result {
             Ok(mut mem) => match { mem.free_allocation(&self.allocation) } {
                 Ok(_) => (),

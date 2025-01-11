@@ -4,18 +4,16 @@ use ash::khr::{surface, swapchain};
 use ash::vk::{
     make_api_version, ApplicationInfo, DebugUtilsMessageSeverityFlagsEXT,
     DebugUtilsMessageTypeFlagsEXT, DebugUtilsMessengerCreateInfoEXT, InstanceCreateFlags,
-    InstanceCreateInfo, MemoryPropertyFlags, MemoryType, PhysicalDevice,
-    PhysicalDeviceMemoryProperties, SurfaceKHR, SwapchainKHR,
+    InstanceCreateInfo, MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceMemoryProperties,
+    SurfaceKHR,
 };
 use ash::{vk, Device, Instance};
-use std::any::Any;
 use std::borrow::Cow;
 use std::ffi;
 use std::fmt::{Debug, Formatter};
-use std::hash::Hash;
 use std::os::raw::c_char;
 use thiserror::Error;
-use tracing::{event, trace, Level};
+use tracing::{event, Level};
 use winit::raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
 
 #[derive(Error, Debug)]
@@ -44,9 +42,6 @@ pub enum VEDeviceError {
     #[error("no suitable physical device found")]
     NoSuitablePhysicalDeviceFound,
 
-    #[error("cannot get physical device surface support")]
-    CannotGetPhysicalDeviceSurfaceSupport(#[source] vk::Result),
-
     #[error("cannot create surface")]
     CannotCreateSurface(#[source] vk::Result),
 
@@ -74,8 +69,8 @@ impl Debug for VEDevice {
 }
 
 unsafe extern "system" fn vulkan_debug_callback(
-    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
+    message_severity: DebugUtilsMessageSeverityFlagsEXT,
+    message_type: DebugUtilsMessageTypeFlagsEXT,
     p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT<'_>,
     _user_data: *mut std::os::raw::c_void,
 ) -> vk::Bool32 {
@@ -125,7 +120,7 @@ impl VEDevice {
             .as_raw();
 
         let mut extension_names = ash_window::enumerate_required_extensions(display_handle)
-            .map_err(VEDeviceError::CannotEnumerateRequiredWindowExtensions)
+            .map_err(VEDeviceError::CannotEnumerateRequiredWindowExtensions)?
             .to_vec();
         extension_names.push(debug_utils::NAME.as_ptr());
         #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -208,15 +203,12 @@ impl VEDevice {
                     .iter()
                     .enumerate()
                     .find_map(|(index, info)| {
+                        let physical_device_surface_support = surface_loader
+                            .get_physical_device_surface_support(*pdevice, index as u32, surface)
+                            .unwrap_or(false);
                         let supports_graphic_and_surface =
                             info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-                                && surface_loader
-                                    .get_physical_device_surface_support(
-                                        *pdevice,
-                                        index as u32,
-                                        surface,
-                                    )
-                                    .map_err(VEDeviceError::CannotGetPhysicalDeviceSurfaceSupport);
+                                && physical_device_surface_support;
                         if supports_graphic_and_surface {
                             Some((*pdevice, index))
                         } else {
@@ -224,7 +216,7 @@ impl VEDevice {
                         }
                     })
             })
-            .ok_or_else(VEDeviceError::NoSuitablePhysicalDeviceFound)?;
+            .ok_or(VEDeviceError::NoSuitablePhysicalDeviceFound)?;
 
         let queue_family_index = queue_family_index as u32;
         let device_extension_names_raw = [
@@ -276,7 +268,7 @@ impl VEDevice {
         for i in 0..self.device_memory_properties.memory_type_count {
             let mem_type = self.device_memory_properties.memory_types[i as usize];
             let prop_flags = mem_type.property_flags;
-            if (type_filter & (1 << i) > 0 && (prop_flags & properties) == properties) {
+            if type_filter & (1 << i) > 0 && (prop_flags & properties) == properties {
                 return Some(i);
             }
         }

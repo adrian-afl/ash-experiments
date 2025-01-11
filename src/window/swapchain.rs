@@ -1,20 +1,14 @@
 use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
-use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
+use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::semaphore::{SemaphoreState, VESemaphore, VESemaphoreError};
-use crate::image::image::VEImage;
-use crate::memory::memory_manager::VEMemoryManager;
+use crate::image::image::{VEImage, VEImageError};
 use crate::window::window::VEWindow;
 use ash::khr::swapchain;
-use ash::prelude::VkResult;
 use ash::vk;
-use ash::vk::{
-    CommandBufferUsageFlags, PresentInfoKHR, PresentModeKHR, SurfaceCapabilitiesKHR,
-    SurfaceFormatKHR, SwapchainKHR,
-};
+use ash::vk::{CommandBufferUsageFlags, PresentInfoKHR, SwapchainKHR};
 use std::fmt::{Debug, Formatter};
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tracing::{event, instrument, Level};
@@ -25,18 +19,32 @@ pub enum VESwapchainError {
     #[error("no winit window found")]
     NoWinitWindowFound,
 
+    #[error("acquire semaphore locking failed")]
+    AcquireSemaphoreLockingFailed,
+
+    #[error("blit semaphore locking failed")]
+    BlitSemaphoreLockingFailed,
+
     #[error("semaphore error")]
     SemaphoreError(#[from] VESemaphoreError),
 
+    #[error("image error")]
+    ImageError(#[from] VEImageError),
+
     #[error("command buffer error")]
     CommandBufferError(#[from] VECommandBufferError),
+
+    #[error("present failed")]
+    PresentFailed(#[source] vk::Result),
+
+    #[error("acquire failed")]
+    AcquireFailed(#[source] vk::Result),
 }
 
 pub struct VESwapchain {
     device: Arc<VEDevice>,
     main_device_queue: Arc<VEMainDeviceQueue>,
     command_pool: Arc<VECommandPool>,
-    memory_manager: Arc<Mutex<VEMemoryManager>>,
 
     swapchain: SwapchainKHR,
     swapchain_loader: swapchain::Device,
@@ -62,7 +70,6 @@ impl VESwapchain {
         device: Arc<VEDevice>,
         main_device_queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
-        memory_manager: Arc<Mutex<VEMemoryManager>>,
     ) -> Result<VESwapchain, VESwapchainError> {
         let winit_window = window
             .window
@@ -73,7 +80,6 @@ impl VESwapchain {
             device.clone(),
             main_device_queue.clone(),
             command_pool.clone(),
-            memory_manager.clone(),
             winit_window.inner_size(),
         );
 
@@ -88,7 +94,6 @@ impl VESwapchain {
             present_images,
             main_device_queue,
             command_pool,
-            memory_manager,
 
             width: winit_window.inner_size().width,
             height: winit_window.inner_size().height,
@@ -103,7 +108,6 @@ impl VESwapchain {
         device: Arc<VEDevice>,
         main_device_queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
-        memory_manager: Arc<Mutex<VEMemoryManager>>,
         new_size: PhysicalSize<u32>,
     ) -> (SwapchainKHR, swapchain::Device, Vec<VEImage>) {
         let swapchain_loader = swapchain::Device::new(&device.instance, &device.device);
@@ -193,7 +197,7 @@ impl VESwapchain {
     }
 
     #[instrument]
-    pub fn recreate(&mut self, new_size: PhysicalSize<u32>) {
+    pub fn recreate(&mut self, new_size: PhysicalSize<u32>) -> Result<(), VESwapchainError> {
         self.present_images.clear();
 
         unsafe {
@@ -205,7 +209,6 @@ impl VESwapchain {
             self.device.clone(),
             self.main_device_queue.clone(),
             self.command_pool.clone(),
-            self.memory_manager.clone(),
             new_size,
         );
 
@@ -217,19 +220,30 @@ impl VESwapchain {
         self.width = new_size.width;
         self.height = new_size.height;
 
-        self.blit_done_semaphore.lock().unwrap().recreate();
-        self.acquire_ready_semaphore.lock().unwrap().recreate();
+        self.blit_done_semaphore
+            .lock()
+            .map_err(|_| VESwapchainError::BlitSemaphoreLockingFailed)?
+            .recreate()?;
+        self.acquire_ready_semaphore
+            .lock()
+            .map_err(|_| VESwapchainError::AcquireSemaphoreLockingFailed)?
+            .recreate()?;
+        Ok(())
     }
 
     #[instrument]
-    pub fn blit(&mut self, source: &VEImage, wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>) {
+    pub fn blit(
+        &mut self,
+        source: &VEImage,
+        wait_for_semaphores: Vec<Arc<Mutex<VESemaphore>>>,
+    ) -> Result<(), VESwapchainError> {
         self.acquire_ready_semaphore.lock().unwrap().state = SemaphoreState::Pending;
         event!(
             Level::TRACE,
             "Setting semaphore acquire_ready_semaphore to Pending"
         );
         let ack_semaphore = self.acquire_ready_semaphore.clone();
-        let acquired = self.acquire_next_image(ack_semaphore.lock().unwrap().handle);
+        let acquired = self.acquire_next_image(ack_semaphore.lock().unwrap().handle)?;
 
         let blit_semaphore = &self.blit_done_semaphore;
         let mut wait_handles: Vec<Arc<Mutex<VESemaphore>>> = vec![];
@@ -240,10 +254,10 @@ impl VESwapchain {
         wait_handles.push(ack_semaphore.clone());
 
         self.present_images[acquired as usize]
-            .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL);
+            .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL)?;
 
         self.present_command_buffer
-            .begin(CommandBufferUsageFlags::SIMULTANEOUS_USE); // TODO try to remove this flag
+            .begin(CommandBufferUsageFlags::SIMULTANEOUS_USE)?; // TODO try to remove this flag
 
         let region = vk::ImageBlit::default()
             .src_subresource(
@@ -285,21 +299,27 @@ impl VESwapchain {
             )
         }
 
-        self.present_command_buffer.end();
+        self.present_command_buffer.end()?;
         self.present_command_buffer.submit(
             &self.main_device_queue,
             wait_handles,
             vec![blit_semaphore.clone()],
-        );
+        )?;
 
         self.present_images[acquired as usize]
-            .transition_layout(vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR);
+            .transition_layout(vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR)?;
 
-        self.present(&[], acquired);
+        self.present(&[], acquired)?;
+
+        Ok(())
     }
 
     #[instrument]
-    fn present(&self, wait_handles: &[vk::Semaphore], image_index: u32) {
+    fn present(
+        &self,
+        wait_handles: &[vk::Semaphore],
+        image_index: u32,
+    ) -> Result<(), VESwapchainError> {
         let swapchains = [self.swapchain];
         let images = [image_index];
         let info = PresentInfoKHR::default()
@@ -307,31 +327,20 @@ impl VESwapchain {
             .swapchains(&swapchains)
             .image_indices(&images);
         unsafe {
-            let result = self
-                .swapchain_loader
-                .queue_present(self.main_device_queue.main_queue, &info);
-            match result {
-                Ok(_) => (), // ignore errors
-                Err(_) => (),
-            }
+            self.swapchain_loader
+                .queue_present(self.main_device_queue.main_queue, &info)
+                .map_err(VESwapchainError::PresentFailed)?;
         }
+        Ok(())
     }
 
     #[instrument]
-    fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> u32 {
+    fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> Result<u32, VESwapchainError> {
         let result = unsafe {
-            self.swapchain_loader.acquire_next_image(
-                self.swapchain,
-                2000,
-                semaphore,
-                vk::Fence::null(),
-            )
+            self.swapchain_loader
+                .acquire_next_image(self.swapchain, 2000, semaphore, vk::Fence::null())
+                .map_err(VESwapchainError::AcquireFailed)?
         };
-        match result {
-            Ok(res) => res.0,
-            Err(_) => {
-                0 // ignore errors
-            }
-        }
+        Ok(result.0)
     }
 }

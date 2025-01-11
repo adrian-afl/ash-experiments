@@ -1,11 +1,12 @@
 use crate::compute::compute_stage::VEComputeStage;
+use crate::core::command_buffer::VECommandBufferError;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::core::semaphore::VESemaphore;
+use crate::core::semaphore::{VESemaphore, VESemaphoreError};
 use crate::graphics::render_stage::VERenderStage;
 use crate::image::image::VEImage;
-use crate::window::swapchain::VESwapchain;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use crate::window::swapchain::{VESwapchain, VESwapchainError};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -18,6 +19,15 @@ pub enum VESchedulerError {
 
     #[error("swapchain locking failed")]
     SwapchainLockingFailed,
+
+    #[error("semaphore error")]
+    SemaphoreError(#[from] VESemaphoreError),
+
+    #[error("swapchain error")]
+    SwapchainError(#[from] VESwapchainError),
+
+    #[error("command buffer error")]
+    CommandBufferError(#[from] VECommandBufferError),
 }
 
 struct BlitStage {
@@ -54,7 +64,7 @@ impl VEScheduler {
         layers_count: u8,
     ) -> VEScheduler {
         let mut layers = vec![];
-        for i in 0..layers_count {
+        for _ in 0..layers_count {
             layers.push(Arc::new(Mutex::from(ScheduleLayer { items: vec![] })));
         }
         VEScheduler {
@@ -65,25 +75,34 @@ impl VEScheduler {
         }
     }
 
-    pub fn make_render_item(&self, stage: Arc<VERenderStage>) -> Arc<Mutex<ScheduleItem>> {
-        Arc::new(Mutex::from(ScheduleItem {
+    pub fn make_render_item(
+        &self,
+        stage: Arc<VERenderStage>,
+    ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {
+        Ok(Arc::new(Mutex::from(ScheduleItem {
             stage: Stage::Render(stage),
-            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
-        }))
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone())?)),
+        })))
     }
 
-    pub fn make_compute_item(&self, stage: Arc<VEComputeStage>) -> Arc<Mutex<ScheduleItem>> {
-        Arc::new(Mutex::from(ScheduleItem {
+    pub fn make_compute_item(
+        &self,
+        stage: Arc<VEComputeStage>,
+    ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {
+        Ok(Arc::new(Mutex::from(ScheduleItem {
             stage: Stage::Compute(stage),
-            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
-        }))
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone())?)),
+        })))
     }
 
-    pub fn make_blit_item(&self, source: Arc<VEImage>) -> Arc<Mutex<ScheduleItem>> {
-        Arc::new(Mutex::from(ScheduleItem {
+    pub fn make_blit_item(
+        &self,
+        source: Arc<VEImage>,
+    ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {
+        Ok(Arc::new(Mutex::from(ScheduleItem {
             stage: Stage::Blit(BlitStage { source }),
-            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone()))),
-        }))
+            semaphore: Arc::new(Mutex::from(VESemaphore::new(self.device.clone())?)),
+        })))
     }
 
     pub fn set_layer(
@@ -110,13 +129,13 @@ impl VEScheduler {
             let layer = self.layers[i]
                 .lock()
                 .map_err(|_| VESchedulerError::LayerLockingFailed)?;
-            if (layer.items.len() > 0) {
+            if layer.items.len() > 0 {
                 non_empty_layers.push(&self.layers[i]);
             }
         }
 
         let mut layer_semaphores: Vec<Vec<Arc<Mutex<VESemaphore>>>> = vec![];
-        for i in 0..non_empty_layers.len() {
+        for _ in 0..non_empty_layers.len() {
             layer_semaphores.push(vec![]);
         }
         for i in 0..non_empty_layers.len() {
@@ -142,7 +161,7 @@ impl VEScheduler {
 
         for i in 0..non_empty_layers.len() {
             // println!("LAYER {i}");
-            let mut layer = self.layers[i]
+            let layer = self.layers[i]
                 .lock()
                 .map_err(|_| VESchedulerError::LayerLockingFailed)?;
             let previous_i = if i == 0 {
@@ -167,7 +186,7 @@ impl VEScheduler {
                             &self.queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
-                        )
+                        )?
                     }
                     Stage::Render(stage) => {
                         let mut previous_semaphores: Vec<Arc<Mutex<VESemaphore>>> = vec![];
@@ -178,14 +197,14 @@ impl VEScheduler {
                             &self.queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
-                        )
+                        )?
                     }
                     Stage::Blit(stage) => {
                         let mut previous_semaphores: Vec<Arc<Mutex<VESemaphore>>> = vec![];
                         for x in 0..layer_semaphores[previous_i].len() {
                             previous_semaphores.push(layer_semaphores[previous_i][x].clone());
                         }
-                        swapchain.blit(&stage.source, previous_semaphores)
+                        swapchain.blit(&stage.source, previous_semaphores)?
                     }
                 }
             }

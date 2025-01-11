@@ -3,6 +3,16 @@ use crate::core::device::VEDevice;
 use crate::core::shader_module::VEShaderModule;
 use ash::vk;
 use std::sync::Arc;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VEComputePipelineError {
+    #[error("layout creation failed")]
+    LayoutCreationFailed(#[source] vk::Result),
+
+    #[error("pipeline creation failed")]
+    PipelineCreationFailed(#[source] vk::Result),
+}
 
 pub struct VEComputePipeline {
     device: Arc<VEDevice>,
@@ -15,7 +25,7 @@ impl VEComputePipeline {
         device: Arc<VEDevice>,
         set_layouts: &[&VEDescriptorSetLayout],
         shader: &VEShaderModule,
-    ) -> VEComputePipeline {
+    ) -> Result<VEComputePipeline, VEComputePipelineError> {
         let shader_stage_info = vk::PipelineShaderStageCreateInfo::default()
             .stage(vk::ShaderStageFlags::COMPUTE)
             .module(shader.handle)
@@ -27,7 +37,7 @@ impl VEComputePipeline {
             device
                 .device
                 .create_pipeline_layout(&pipeline_layout_info, None)
-                .unwrap()
+                .map_err(VEComputePipelineError::LayoutCreationFailed)?
         };
 
         let pipeline_info = vk::ComputePipelineCreateInfo::default()
@@ -38,14 +48,14 @@ impl VEComputePipeline {
             device
                 .device
                 .create_compute_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
-                .unwrap()[0]
+                .map_err(|e| VEComputePipelineError::LayoutCreationFailed(e.1))?[0]
         };
 
-        VEComputePipeline {
+        Ok(VEComputePipeline {
             device,
             pipeline,
             layout: pipeline_layout,
-        }
+        })
     }
 }
 

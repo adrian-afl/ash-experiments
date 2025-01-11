@@ -96,7 +96,11 @@ impl VEImage {
         self.format == vk::Format::D16_UNORM || self.format == vk::Format::D32_SFLOAT
     }
 
-    pub fn transition_layout(&mut self, from_layout: vk::ImageLayout, to_layout: vk::ImageLayout) {
+    pub fn transition_layout(
+        &mut self,
+        from_layout: vk::ImageLayout,
+        to_layout: vk::ImageLayout,
+    ) -> Result<(), VEImageError> {
         transition_image_layout(
             self.device.clone(),
             self.command_pool.clone(),
@@ -105,9 +109,11 @@ impl VEImage {
             self.aspect,
             from_layout,
             to_layout,
-        );
+        )?;
 
         self.current_layout = to_layout;
+
+        Ok(())
     }
 }
 
