@@ -25,7 +25,7 @@ use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::{VESwapchain, VESwapchainError};
 use crate::window::window::{AppCallback, VEWindow};
 use ash::vk;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LockResult, Mutex};
 use std::{fs, io};
 use thiserror::Error;
 use winit::dpi::PhysicalSize;
@@ -71,23 +71,43 @@ impl AppCallback for VEToolkitCallbacks {
     }
 
     fn on_window_draw(&self) {
-        self.app
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .draw(self.toolkit.as_ref().unwrap());
+        let app = self.app.as_ref();
+        match app {
+            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            Some(app) => {
+                let app = app.lock();
+                match app {
+                    Ok(mut app) => {
+                        let toolkit = self.toolkit.as_ref();
+                        match toolkit {
+                            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
+                            Some(toolkit) => app.draw(toolkit),
+                        }
+                    }
+                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                }
+            }
+        }
     }
 
     fn on_window_resize(&self, new_size: PhysicalSize<u32>) {
-        self.toolkit.as_ref().unwrap().device.wait_idle();
-        self.toolkit
-            .as_ref()
-            .unwrap()
-            .swapchain
-            .lock()
-            .unwrap()
-            .recreate(new_size);
+        let toolkit = self.toolkit.as_ref();
+        match toolkit {
+            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
+            Some(toolkit) => match toolkit.device.wait_idle() {
+                Ok(_) => {
+                    let swapchain = toolkit.swapchain.lock();
+                    match swapchain {
+                        Ok(mut swapchain) => match swapchain.recreate(new_size) {
+                            Ok(_) => ()
+                            Err(error) => println!("Cannot recreate Swapchain! Reason: {:?}", error),
+                        },
+                        Err(error) => println!("Cannot lock Swapchain! Reason: {:?}", error),
+                    }
+                }
+                Err(error) => println!("Cannot wait idle on Device! Reason: {:?}", error),
+            },
+        }
     }
 }
 

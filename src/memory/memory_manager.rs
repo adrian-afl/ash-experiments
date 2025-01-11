@@ -77,15 +77,11 @@ impl VEMemoryManager {
         memory_type_index: u32,
         size: u64,
     ) -> Result<(&mut VEMemoryChunk, u64), VEMemoryChunkError> {
-        if !self.chunks.contains_key(&memory_type_index) {
-            self.chunks.insert(memory_type_index, vec![]);
-        }
-        let chunks_for_type = self.chunks.get_mut(&memory_type_index).unwrap();
+        let chunks_for_type = self.chunks.entry(memory_type_index).or_default();
 
         for i in 0..chunks_for_type.len() {
-            match chunks_for_type[i].find_free_memory_offset(size) {
-                Some(offset) => return Ok((&mut chunks_for_type[i], offset)),
-                None => (),
+            if let Some(offset) = chunks_for_type[i].find_free_memory_offset(size) {
+                return Ok((&mut chunks_for_type[i], offset));
             }
         }
 
@@ -95,9 +91,11 @@ impl VEMemoryManager {
             self.device.clone(),
             self.identifier_counter,
             memory_type_index,
-        );
-        chunks_for_type.push(chunk?);
-        Ok((chunks_for_type.last_mut().unwrap(), 0))
+        )?;
+        chunks_for_type.push(chunk);
+        let last_index = chunks_for_type.len() - 1;
+        // honestly, i dont know why rust allows this
+        Ok((&mut chunks_for_type[last_index], 0))
     }
 
     #[instrument]
@@ -115,7 +113,7 @@ impl VEMemoryManager {
                     self.mapped = true;
                     return chunk
                         .map(allocation.offset, allocation.size)
-                        .map_err(|e| VEMemoryManagerError::MappingFailed(e));
+                        .map_err(VEMemoryManagerError::MappingFailed);
                 }
             }
         }

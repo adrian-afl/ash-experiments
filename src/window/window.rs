@@ -2,11 +2,22 @@ use crate::core::toolkit::VEToolkit;
 use ash::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
+use winit::error::EventLoopError;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowAttributes, WindowId};
+
+#[derive(Error, Debug)]
+pub enum VEWindowError {
+    #[error("event loop creation failed")]
+    EventLoopCreationFailed(#[source] EventLoopError),
+
+    #[error("event loop cannot start")]
+    EventLoopCannotStart(#[source] EventLoopError),
+}
 
 pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: VEToolkit);
@@ -31,33 +42,56 @@ impl Debug for VEWindow {
 
 impl ApplicationHandler for VEWindow {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = event_loop
-            .create_window(self.initial_window_attributes.clone())
-            .unwrap();
+        let window = event_loop.create_window(self.initial_window_attributes.clone());
 
-        self.window = Some(window);
-        self.on_window_ready();
+        match window {
+            Ok(window) => {
+                self.window = Some(window);
+                self.on_window_ready();
 
-        let window = self.window.as_ref().unwrap();
-        window.request_redraw();
+                let window = self.window.as_ref();
+                match window {
+                    None => println!(
+                        "Completely unexpected problem that window is None right after assignment"
+                    ),
+                    Some(window) => window.request_redraw(),
+                }
+            }
+            Err(error) => println!("Window cannot be created! Reason: {:?}", error),
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        let window = self.window.as_ref().unwrap();
-        match event {
-            WindowEvent::CloseRequested => {
-                println!("The close button was pressed; stopping");
-                event_loop.exit();
-            }
-            WindowEvent::RedrawRequested => {
-                window.pre_present_notify();
-                self.app.lock().unwrap().on_window_draw();
-                window.request_redraw();
-            }
-            WindowEvent::Resized(new_size) => {
-                self.app.lock().unwrap().on_window_resize(new_size);
-            }
-            _ => (),
+        let window = self.window.as_ref();
+        match window {
+            None => println!("Completely unexpected problem that window is None"),
+            Some(window) => match event {
+                WindowEvent::CloseRequested => {
+                    println!("The close button was pressed; stopping");
+                    event_loop.exit();
+                }
+                WindowEvent::RedrawRequested => {
+                    window.pre_present_notify();
+                    let locked_app = self.app.lock();
+                    match locked_app {
+                        Ok(app) => {
+                            app.on_window_draw();
+                            window.request_redraw();
+                        }
+                        Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    };
+                }
+                WindowEvent::Resized(new_size) => {
+                    let locked_app = self.app.lock();
+                    match locked_app {
+                        Ok(app) => {
+                            app.on_window_resize(new_size);
+                        }
+                        Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    };
+                }
+                _ => (),
+            },
         }
     }
 
@@ -75,8 +109,8 @@ impl VEWindow {
     pub fn new(
         app: Arc<Mutex<dyn AppCallback>>,
         initial_window_attributes: WindowAttributes,
-    ) -> VEWindow {
-        let event_loop = EventLoop::new().unwrap();
+    ) -> Result<VEWindow, VEWindowError> {
+        let event_loop = EventLoop::new().map_err(VEWindowError::EventLoopCreationFailed)?;
 
         let mut window = VEWindow {
             window: None,
@@ -86,13 +120,26 @@ impl VEWindow {
         };
 
         event_loop.set_control_flow(ControlFlow::Poll);
-        event_loop.run_app(&mut window).expect("Can't run`");
+        event_loop
+            .run_app(&mut window)
+            .map_err(VEWindowError::EventLoopCannotStart)?;
 
-        window
+        Ok(window)
     }
 
     fn on_window_ready(&self) {
         let toolkit = VEToolkit::new(self);
-        self.app.lock().unwrap().on_window_ready(toolkit);
+        match toolkit {
+            Ok(toolkit) => {
+                let locked_app = self.app.lock();
+                match locked_app {
+                    Ok(mut app) => {
+                        app.on_window_ready(toolkit);
+                    }
+                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                };
+            }
+            Err(error) => println!("Toolkit cannot be created! Reason: {:?}", error),
+        }
     }
 }
