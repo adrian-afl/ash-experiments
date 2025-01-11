@@ -5,10 +5,9 @@ use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
     VEDescriptorSetLayoutField,
 };
-use vengine_rs::core::helpers::{make_clear_color_f32, make_clear_depth};
+use vengine_rs::core::helpers::{clear_color_f32, clear_depth};
 use vengine_rs::core::memory_properties::VEMemoryProperties;
 use vengine_rs::core::scheduler::VEScheduler;
-use vengine_rs::core::semaphore::VESemaphore;
 use vengine_rs::core::shader_module::VEShaderModuleType;
 use vengine_rs::core::toolkit::{App, VEToolkit};
 use vengine_rs::graphics::attachment::VEAttachment;
@@ -16,7 +15,7 @@ use vengine_rs::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERend
 use vengine_rs::graphics::vertex_attributes::VertexAttribFormat;
 use vengine_rs::graphics::vertex_buffer::VEVertexBuffer;
 use vengine_rs::image::filtering::VEFiltering;
-use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo, VEImageViewType};
+use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo};
 use vengine_rs::image::image_format::VEImageFormat;
 use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
 
@@ -54,15 +53,15 @@ struct Mesh {
 #[allow(clippy::unwrap_used)]
 impl DingusApp {
     pub fn new(toolkit: &VEToolkit) -> DingusApp {
-        let mesh_stage = Self::make_mesh_stage(toolkit);
+        let mesh_stage = Self::create_mesh_stage(toolkit);
 
-        let mut scheduler = toolkit.make_scheduler(2);
+        let mut scheduler = toolkit.create_scheduler(2);
 
         let render_item = scheduler
-            .make_render_item(mesh_stage.render_stage.clone())
+            .create_render_item(mesh_stage.render_stage.clone())
             .unwrap();
         let blit_item = scheduler
-            .make_blit_item(mesh_stage.color_buffer.clone())
+            .create_blit_item(mesh_stage.color_buffer.clone())
             .unwrap();
 
         scheduler.set_layer(0, vec![render_item]).unwrap();
@@ -76,7 +75,7 @@ impl DingusApp {
             elapsed: 0.0,
         };
 
-        let dingus = app.make_mesh(
+        let dingus = app.create_mesh(
             toolkit,
             "examples/dingus_mesh/dingus.jpg",
             "examples/dingus_mesh/dingus.raw",
@@ -87,22 +86,22 @@ impl DingusApp {
         app
     }
 
-    fn make_mesh_stage(toolkit: &VEToolkit) -> MeshStage {
+    fn create_mesh_stage(toolkit: &VEToolkit) -> MeshStage {
         let vertex_shader = toolkit
-            .make_shader_module(
+            .create_shader_module(
                 "examples/dingus_mesh/vertex.spv",
                 VEShaderModuleType::Vertex,
             )
             .unwrap();
         let fragment_shader = toolkit
-            .make_shader_module(
+            .create_shader_module(
                 "examples/dingus_mesh/fragment.spv",
                 VEShaderModuleType::Fragment,
             )
             .unwrap();
 
         let mut global_descriptor_set_layout = toolkit
-            .make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+            .create_descriptor_set_layout(&[VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::UniformBuffer,
                 stage: VEDescriptorSetFieldStage::AllGraphics,
@@ -110,7 +109,7 @@ impl DingusApp {
             .unwrap();
 
         let mut mesh_descriptor_set_layout = toolkit
-            .make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+            .create_descriptor_set_layout(&[VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::Sampler,
                 stage: VEDescriptorSetFieldStage::Fragment,
@@ -122,7 +121,7 @@ impl DingusApp {
             .unwrap();
 
         let uniform_buffer = toolkit
-            .make_buffer(
+            .create_buffer(
                 VEBufferType::Uniform,
                 128,
                 Some(VEMemoryProperties::HostCoherent),
@@ -136,7 +135,7 @@ impl DingusApp {
         let height = 480;
 
         let mut color_buffer = toolkit
-            .make_image_full(
+            .create_image_full(
                 width,
                 height,
                 1,
@@ -154,7 +153,7 @@ impl DingusApp {
             &color_buffer,
             color_attachment_view,
             None,
-            Some(make_clear_color_f32([0.0, 0.0, 1.0, 1.0])),
+            Some(clear_color_f32([0.0, 0.0, 1.0, 1.0])),
             false,
         )
         .unwrap();
@@ -162,7 +161,7 @@ impl DingusApp {
         let color_buffer = Arc::from(color_buffer);
 
         let mut depth_buffer = toolkit
-            .make_image_full(
+            .create_image_full(
                 width,
                 height,
                 1,
@@ -180,7 +179,7 @@ impl DingusApp {
             &depth_buffer,
             depth_attachment_view,
             None,
-            Some(make_clear_depth(1.0)),
+            Some(clear_depth(1.0)),
             false,
         )
         .unwrap();
@@ -194,7 +193,7 @@ impl DingusApp {
 
         let render_stage = Arc::new(
             toolkit
-                .make_render_stage(
+                .create_render_stage(
                     width,
                     height,
                     &[&color_attachment, &depth_attachment],
@@ -224,7 +223,7 @@ impl DingusApp {
         }
     }
 
-    pub fn make_mesh(&mut self, toolkit: &VEToolkit, texture: &str, model: &str) -> Mesh {
+    pub fn create_mesh(&mut self, toolkit: &VEToolkit, texture: &str, model: &str) -> Mesh {
         let descriptor_set = self
             .mesh_stage
             .mesh_descriptor_set_layout
@@ -232,15 +231,15 @@ impl DingusApp {
             .unwrap();
 
         let vertex_buffer = toolkit
-            .make_vertex_buffer_from_file(model, &self.mesh_stage.vertex_attributes)
+            .create_vertex_buffer_from_file(model, &self.mesh_stage.vertex_attributes)
             .unwrap();
 
         let mut texture = toolkit
-            .make_image_from_file(texture, &[VEImageUsage::Sampled])
+            .create_image_from_file(texture, &[VEImageUsage::Sampled])
             .unwrap();
 
         let sampler = toolkit
-            .make_sampler(
+            .create_sampler(
                 VESamplerAddressMode::Repeat,
                 VEFiltering::Linear,
                 VEFiltering::Linear,

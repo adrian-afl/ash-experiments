@@ -171,11 +171,11 @@ impl VEToolkit {
         })
     }
 
-    pub fn make_command_buffer(&self) -> Result<VECommandBuffer, VECommandBufferError> {
+    pub fn create_command_buffer(&self) -> Result<VECommandBuffer, VECommandBufferError> {
         VECommandBuffer::new(self.device.clone(), self.command_pool.clone())
     }
 
-    pub fn make_shader_module(
+    pub fn create_shader_module(
         &self,
         path: &str,
         typ: VEShaderModuleType,
@@ -183,14 +183,14 @@ impl VEToolkit {
         VEShaderModule::from_file(self.device.clone(), path, typ)
     }
 
-    pub fn make_descriptor_set_layout(
+    pub fn create_descriptor_set_layout(
         &self,
         fields: &[VEDescriptorSetLayoutField],
     ) -> Result<VEDescriptorSetLayout, VEDescriptorSetLayoutError> {
         VEDescriptorSetLayout::new(self.device.clone(), fields)
     }
 
-    pub fn make_image_full(
+    pub fn create_image_full(
         &self,
         width: u32,
         height: u32,
@@ -216,7 +216,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_image_from_data(
+    pub fn create_image_from_data(
         &self,
         data: Vec<u8>,
 
@@ -245,7 +245,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_image_from_file(
+    pub fn create_image_from_file(
         &self,
         path: &str,
         usages: &[VEImageUsage],
@@ -260,7 +260,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_sampler(
+    pub fn create_sampler(
         &self,
         sampler_address_mode: VESamplerAddressMode,
 
@@ -278,11 +278,11 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_semaphore(&self) -> Result<VESemaphore, VESemaphoreError> {
+    pub fn create_semaphore(&self) -> Result<VESemaphore, VESemaphoreError> {
         VESemaphore::new(self.device.clone())
     }
 
-    pub fn make_buffer(
+    pub fn create_buffer(
         &self,
         typ: VEBufferType,
         size: vk::DeviceSize,
@@ -299,11 +299,11 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_vertex_buffer(&self, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
+    pub fn create_vertex_buffer(&self, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
         VEVertexBuffer::new(self.device.clone(), buffer, vertex_count)
     }
 
-    pub fn make_vertex_buffer_from_file(
+    pub fn create_vertex_buffer_from_file(
         &self,
         path: &str,
         vertex_attributes: &[VertexAttribFormat],
@@ -318,7 +318,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_compute_stage(
+    pub fn create_compute_stage(
         &self,
         set_layouts: &[&VEDescriptorSetLayout],
         shader: &VEShaderModule,
@@ -331,7 +331,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_render_stage(
+    pub fn create_render_stage(
         &self,
         viewport_width: u32,
         viewport_height: u32,
@@ -358,7 +358,7 @@ impl VEToolkit {
         )
     }
 
-    pub fn make_scheduler(&self, layers_count: u8) -> VEScheduler {
+    pub fn create_scheduler(&self, layers_count: u8) -> VEScheduler {
         VEScheduler::new(
             self.device.clone(),
             self.swapchain.clone(),

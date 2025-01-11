@@ -75,7 +75,7 @@ impl VEScheduler {
         }
     }
 
-    pub fn make_render_item(
+    pub fn create_render_item(
         &self,
         stage: Arc<VERenderStage>,
     ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {
@@ -85,7 +85,7 @@ impl VEScheduler {
         })))
     }
 
-    pub fn make_compute_item(
+    pub fn create_compute_item(
         &self,
         stage: Arc<VEComputeStage>,
     ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {
@@ -95,7 +95,7 @@ impl VEScheduler {
         })))
     }
 
-    pub fn make_blit_item(
+    pub fn create_blit_item(
         &self,
         source: Arc<VEImage>,
     ) -> Result<Arc<Mutex<ScheduleItem>>, VESchedulerError> {

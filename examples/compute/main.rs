@@ -20,7 +20,7 @@ struct ComputeApp {}
 impl ComputeApp {
     pub fn calculate(toolkit: &VEToolkit) -> ComputeApp {
         let mut buffer = toolkit
-            .make_buffer(
+            .create_buffer(
                 VEBufferType::Storage,
                 128,
                 Some(VEMemoryProperties::HostCoherent),
@@ -36,7 +36,7 @@ impl ComputeApp {
         buffer.unmap().unwrap();
 
         let mut set_layout = toolkit
-            .make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+            .create_descriptor_set_layout(&[VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::StorageBuffer,
                 stage: VEDescriptorSetFieldStage::Compute,
@@ -44,10 +44,12 @@ impl ComputeApp {
             .unwrap();
 
         let shader = toolkit
-            .make_shader_module("examples/compute/compute.spv", VEShaderModuleType::Compute)
+            .create_shader_module("examples/compute/compute.spv", VEShaderModuleType::Compute)
             .unwrap();
 
-        let compute_stage = toolkit.make_compute_stage(&[&set_layout], &shader).unwrap();
+        let compute_stage = toolkit
+            .create_compute_stage(&[&set_layout], &shader)
+            .unwrap();
 
         let set = set_layout.create_descriptor_set().unwrap();
         set.bind_buffer(0, &buffer).unwrap();
@@ -72,15 +74,12 @@ impl ComputeApp {
         }
         buffer.unmap().unwrap();
 
-        ComputeApp {}
+        process::exit(0);
     }
 }
 
 impl App for ComputeApp {
-    fn draw(&mut self, toolkit: &VEToolkit) {
-        println!("DRAW2");
-        process::exit(0);
-    }
+    fn draw(&mut self, toolkit: &VEToolkit) {}
 }
 
 #[allow(clippy::unwrap_used)]
