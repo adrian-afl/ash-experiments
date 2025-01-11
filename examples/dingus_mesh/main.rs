@@ -11,6 +11,7 @@ use vengine_rs::core::toolkit::{App, VEToolkit};
 use winit::dpi::PhysicalSize;
 use winit::window::WindowAttributes;
 
+#[allow(clippy::unwrap_used)]
 fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_ansi(false)
@@ -19,7 +20,7 @@ fn main() {
         .with_max_level(Level::TRACE)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let window_attributes = WindowAttributes::default()
         .with_inner_size(PhysicalSize::new(1280, 720))
@@ -32,4 +33,5 @@ fn main() {
         }),
         window_attributes,
     )
+    .unwrap()
 }

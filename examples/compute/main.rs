@@ -16,54 +16,61 @@ use winit::window::WindowAttributes;
 
 struct ComputeApp {}
 
+#[allow(clippy::unwrap_used)]
 impl ComputeApp {
     pub fn calculate(toolkit: &VEToolkit) -> ComputeApp {
-        let mut buffer = toolkit.make_buffer(
-            VEBufferType::Storage,
-            128,
-            Some(VEMemoryProperties::HostCoherent),
-        );
-        let pointer = buffer.map() as *mut f32;
+        let mut buffer = toolkit
+            .make_buffer(
+                VEBufferType::Storage,
+                128,
+                Some(VEMemoryProperties::HostCoherent),
+            )
+            .unwrap();
+        let pointer = buffer.map().unwrap() as *mut f32;
         unsafe {
             pointer.offset(0).write(1.0);
             pointer.offset(1).write(10.0);
             pointer.offset(2).write(100.0);
             pointer.offset(3).write(1000.0);
         }
-        buffer.unmap();
+        buffer.unmap().unwrap();
 
-        let mut set_layout = toolkit.make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
-            binding: 0,
-            typ: VEDescriptorSetFieldType::StorageBuffer,
-            stage: VEDescriptorSetFieldStage::Compute,
-        }]);
+        let mut set_layout = toolkit
+            .make_descriptor_set_layout(&[VEDescriptorSetLayoutField {
+                binding: 0,
+                typ: VEDescriptorSetFieldType::StorageBuffer,
+                stage: VEDescriptorSetFieldStage::Compute,
+            }])
+            .unwrap();
 
-        let shader =
-            toolkit.make_shader_module("examples/compute/compute.spv", VEShaderModuleType::Compute);
+        let shader = toolkit
+            .make_shader_module("examples/compute/compute.spv", VEShaderModuleType::Compute)
+            .unwrap();
 
-        let compute_stage = toolkit.make_compute_stage(&[&set_layout], &shader);
+        let compute_stage = toolkit.make_compute_stage(&[&set_layout], &shader).unwrap();
 
-        let set = set_layout.create_descriptor_set();
+        let set = set_layout.create_descriptor_set().unwrap();
         set.bind_buffer(0, &buffer);
 
-        compute_stage.begin_recording();
+        compute_stage.begin_recording().unwrap();
         compute_stage.set_descriptor_set(0, &set);
         compute_stage.dispatch(4, 1, 1);
-        compute_stage.end_recording();
+        compute_stage.end_recording().unwrap();
         compute_stage
             .command_buffer
-            .submit(&toolkit.queue, vec![], vec![]);
+            .submit(&toolkit.queue, vec![], vec![])
+            .unwrap();
 
-        toolkit.queue.wait_idle();
+        toolkit.queue.wait_idle().unwrap();
 
-        let pointer = buffer.map() as *mut f32;
+        let pointer = buffer.map().unwrap() as *mut f32;
         unsafe {
             println!("{}", pointer.offset(0).read());
             println!("{}", pointer.offset(1).read());
             println!("{}", pointer.offset(2).read());
             println!("{}", pointer.offset(3).read());
         }
-        buffer.unmap();
+        buffer.unmap().unwrap();
 
         ComputeApp {}
     }
@@ -71,10 +78,12 @@ impl ComputeApp {
 
 impl App for ComputeApp {
     fn draw(&mut self, toolkit: &VEToolkit) {
+        println!("DRAW2");
         process::exit(0);
     }
 }
 
+#[allow(clippy::unwrap_used)]
 fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_ansi(false)
@@ -83,7 +92,7 @@ fn main() {
         .with_max_level(Level::TRACE)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let window_attributes = WindowAttributes::default()
         .with_inner_size(PhysicalSize::new(1, 1))
@@ -97,4 +106,5 @@ fn main() {
         }),
         window_attributes,
     )
+    .unwrap()
 }
