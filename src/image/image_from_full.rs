@@ -7,6 +7,7 @@ use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::{get_image_format, VEImageFormat};
 use crate::memory::memory_manager::VEMemoryManager;
 use ash::vk;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 fn get_image_usage_flags(usages: &[VEImageUsage]) -> vk::ImageUsageFlags {
@@ -91,36 +92,6 @@ impl VEImage {
                 .bind_image_memory(mem_index, image_handle, mem_reqs.size)?,
         };
 
-        let image_view_create_info = vk::ImageViewCreateInfo::default()
-            .image(image_handle)
-            .view_type(if depth == 1 {
-                vk::ImageViewType::TYPE_2D
-            } else {
-                vk::ImageViewType::TYPE_3D
-            })
-            .format(format)
-            .subresource_range(
-                vk::ImageSubresourceRange::default()
-                    .aspect_mask(aspect)
-                    .base_mip_level(0)
-                    .level_count(1) // TODO mip mapping
-                    .base_array_layer(0)
-                    .layer_count(1),
-            )
-            .components(vk::ComponentMapping {
-                r: vk::ComponentSwizzle::IDENTITY, // TODO identity?
-                g: vk::ComponentSwizzle::IDENTITY,
-                b: vk::ComponentSwizzle::IDENTITY,
-                a: vk::ComponentSwizzle::IDENTITY,
-            });
-
-        let image_view_handle = unsafe {
-            device
-                .device
-                .create_image_view(&image_view_create_info, None)
-                .map_err(VEImageError::ImageViewCreationFailed)?
-        };
-
         let mut image = VEImage {
             device,
             queue,
@@ -137,7 +108,7 @@ impl VEImage {
             aspect,
 
             handle: image_handle,
-            view: Some(image_view_handle),
+            views: HashMap::new(),
             current_layout: vk::ImageLayout::PREINITIALIZED,
         };
         image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL)?;

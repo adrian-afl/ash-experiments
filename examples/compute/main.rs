@@ -50,7 +50,7 @@ impl ComputeApp {
         let compute_stage = toolkit.make_compute_stage(&[&set_layout], &shader).unwrap();
 
         let set = set_layout.create_descriptor_set().unwrap();
-        set.bind_buffer(0, &buffer);
+        set.bind_buffer(0, &buffer).unwrap();
 
         compute_stage.begin_recording().unwrap();
         compute_stage.set_descriptor_set(0, &set);

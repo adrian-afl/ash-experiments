@@ -1,6 +1,6 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferType};
+use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
 use crate::core::device::VEDevice;
-use crate::image::image::VEImage;
+use crate::image::image::{VEImage, VEImageViewCreateInfo};
 use crate::image::sampler::VESampler;
 use ash::vk;
 use std::sync::Arc;
@@ -13,6 +13,9 @@ pub enum VEDescriptorSetError {
 
     #[error("image view not found when binding an image")]
     ImageViewNotFound,
+
+    #[error("invalid buffer type for descriptor set")]
+    InvalidBufferType,
 }
 
 pub struct VEDescriptorSet {
@@ -38,10 +41,11 @@ impl VEDescriptorSet {
         &self,
         binding: u32,
         image: &VEImage,
+        view: vk::ImageView,
         sampler: &VESampler,
     ) -> Result<(), VEDescriptorSetError> {
         let infos = [vk::DescriptorImageInfo::default()
-            .image_view(image.view.ok_or(VEDescriptorSetError::ImageViewNotFound)?)
+            .image_view(view)
             .sampler(sampler.handle)
             .image_layout(image.current_layout)];
         Ok(self.write(
@@ -56,9 +60,10 @@ impl VEDescriptorSet {
         &self,
         binding: u32,
         image: &VEImage,
+        view: vk::ImageView,
     ) -> Result<(), VEDescriptorSetError> {
         let infos = [vk::DescriptorImageInfo::default()
-            .image_view(image.view.ok_or(VEDescriptorSetError::ImageViewNotFound)?)
+            .image_view(view)
             .image_layout(image.current_layout)];
         Ok(self.write(
             vk::WriteDescriptorSet::default()
@@ -68,24 +73,22 @@ impl VEDescriptorSet {
         ))
     }
 
-    pub fn bind_buffer(&self, binding: u32, buffer: &VEBuffer) {
+    pub fn bind_buffer(&self, binding: u32, buffer: &VEBuffer) -> Result<(), VEDescriptorSetError> {
         let infos = [vk::DescriptorBufferInfo::default()
             .buffer(buffer.buffer)
             .offset(0)
             .range(buffer.size)];
-        self.write(
+        let typ = match buffer.typ {
+            VEBufferType::Uniform => Ok(vk::DescriptorType::UNIFORM_BUFFER),
+            VEBufferType::Storage => Ok(vk::DescriptorType::STORAGE_BUFFER),
+            _ => Err(VEDescriptorSetError::InvalidBufferType),
+        }?;
+        Ok(self.write(
             vk::WriteDescriptorSet::default()
                 .dst_binding(binding)
-                .descriptor_type(match buffer.typ {
-                    VEBufferType::Uniform => vk::DescriptorType::UNIFORM_BUFFER,
-                    VEBufferType::Storage => vk::DescriptorType::STORAGE_BUFFER,
-                    _ => panic!(
-                        "Cannot use buffer type {:?} in a descriptor set",
-                        buffer.typ
-                    ),
-                })
+                .descriptor_type(typ)
                 .buffer_info(&infos),
-        )
+        ))
     }
 
     fn write(&self, write: vk::WriteDescriptorSet) {

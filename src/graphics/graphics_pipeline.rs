@@ -91,7 +91,7 @@ impl VEGraphicsPipeline {
 
         let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
             .depth_clamp_enable(true)
-            .rasterizer_discard_enable(false) // TODO sure????
+            .rasterizer_discard_enable(false)
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
             .cull_mode(cull_flags)

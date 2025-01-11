@@ -24,6 +24,7 @@ pub struct VEAttachment {
 impl VEAttachment {
     pub fn from_image(
         image: &VEImage,
+        view: vk::ImageView,
         blending: Option<AttachmentBlending>,
         clear: Option<vk::ClearValue>,
         for_present: bool,
@@ -49,7 +50,7 @@ impl VEAttachment {
             });
 
         Ok(VEAttachment {
-            image_view: image.view.ok_or(VEAttachmentError::ImageViewNotFound)?,
+            image_view: view,
             is_depth: image.is_depth(),
             description,
             blending,

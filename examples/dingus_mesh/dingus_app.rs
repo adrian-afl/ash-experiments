@@ -16,7 +16,7 @@ use vengine_rs::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERend
 use vengine_rs::graphics::vertex_attributes::VertexAttribFormat;
 use vengine_rs::graphics::vertex_buffer::VEVertexBuffer;
 use vengine_rs::image::filtering::VEFiltering;
-use vengine_rs::image::image::{VEImage, VEImageUsage};
+use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo, VEImageViewType};
 use vengine_rs::image::image_format::VEImageFormat;
 use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
 
@@ -65,8 +65,8 @@ impl DingusApp {
             .make_blit_item(mesh_stage.color_buffer.clone())
             .unwrap();
 
-        scheduler.set_layer(0, vec![render_item]);
-        scheduler.set_layer(1, vec![blit_item]);
+        scheduler.set_layer(0, vec![render_item]).unwrap();
+        scheduler.set_layer(1, vec![blit_item]).unwrap();
 
         let mut app = DingusApp {
             mesh_stage,
@@ -128,33 +128,40 @@ impl DingusApp {
                 Some(VEMemoryProperties::HostCoherent),
             )
             .unwrap();
-        global_descriptor_set.bind_buffer(0, &uniform_buffer);
+        global_descriptor_set
+            .bind_buffer(0, &uniform_buffer)
+            .unwrap();
 
         let width = 640;
         let height = 480;
 
-        let color_buffer = Arc::from(
-            toolkit
-                .make_image_full(
-                    width,
-                    height,
-                    1,
-                    VEImageFormat::RGBA32f,
-                    &[VEImageUsage::ColorAttachment, VEImageUsage::TransferSource],
-                    None,
-                )
-                .unwrap(),
-        );
+        let mut color_buffer = toolkit
+            .make_image_full(
+                width,
+                height,
+                1,
+                VEImageFormat::RGBA32f,
+                &[VEImageUsage::ColorAttachment, VEImageUsage::TransferSource],
+                None,
+            )
+            .unwrap();
+
+        let color_attachment_view = color_buffer
+            .get_view(VEImageViewCreateInfo::simple_2d())
+            .unwrap();
 
         let color_attachment = VEAttachment::from_image(
             &color_buffer,
+            color_attachment_view,
             None,
             Some(make_clear_color_f32([0.0, 0.0, 1.0, 1.0])),
             false,
         )
         .unwrap();
 
-        let depth_buffer = toolkit
+        let color_buffer = Arc::from(color_buffer);
+
+        let mut depth_buffer = toolkit
             .make_image_full(
                 width,
                 height,
@@ -165,9 +172,18 @@ impl DingusApp {
             )
             .unwrap();
 
-        let depth_attachment =
-            VEAttachment::from_image(&depth_buffer, None, Some(make_clear_depth(1.0)), false)
-                .unwrap();
+        let depth_attachment_view = depth_buffer
+            .get_view(VEImageViewCreateInfo::simple_2d())
+            .unwrap();
+
+        let depth_attachment = VEAttachment::from_image(
+            &depth_buffer,
+            depth_attachment_view,
+            None,
+            Some(make_clear_depth(1.0)),
+            false,
+        )
+        .unwrap();
 
         let vertex_attributes = [
             VertexAttribFormat::RGB32f,
@@ -219,7 +235,7 @@ impl DingusApp {
             .make_vertex_buffer_from_file(model, &self.mesh_stage.vertex_attributes)
             .unwrap();
 
-        let texture = toolkit
+        let mut texture = toolkit
             .make_image_from_file(texture, &[VEImageUsage::Sampled])
             .unwrap();
 
@@ -232,8 +248,12 @@ impl DingusApp {
             )
             .unwrap();
 
+        let texture_view = texture
+            .get_view(VEImageViewCreateInfo::simple_2d())
+            .unwrap();
+
         descriptor_set
-            .bind_image_sampler(0, &texture, &sampler)
+            .bind_image_sampler(0, &texture, texture_view, &sampler)
             .unwrap();
 
         Mesh {
@@ -275,6 +295,6 @@ impl App for DingusApp {
 
         self.scheduler.run().unwrap();
 
-        self.elapsed += 0.01;
+        self.elapsed += 0.001;
     }
 }

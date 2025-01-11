@@ -4,10 +4,12 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::image::transition_image_layout::transition_image_layout;
-use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
+use crate::memory::memory_chunk::{VEMemoryChunk, VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::VEMemoryManagerError;
 use ash::vk;
+use ash::vk::ImageView;
 use image::ImageError;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::sync::Arc;
@@ -68,6 +70,48 @@ pub enum VEImageUsage {
     TransferSource,
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum VEImageViewType {
+    View1D,
+    View2D,
+    View3D,
+    ViewCube,
+    View1DArray,
+    View2DArray,
+    ViewCubeArray,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct VEImageViewCreateInfo {
+    pub typ: VEImageViewType,
+    pub base_mipmap: u32,
+    pub mipmap_count: u32,
+    pub base_layer: u32,
+    pub layer_count: u32,
+}
+
+impl VEImageViewCreateInfo {
+    pub fn simple_2d() -> VEImageViewCreateInfo {
+        VEImageViewCreateInfo {
+            typ: VEImageViewType::View2D,
+            base_layer: 0,
+            layer_count: 1,
+            base_mipmap: 0,
+            mipmap_count: 1,
+        }
+    }
+
+    pub fn simple_3d() -> VEImageViewCreateInfo {
+        VEImageViewCreateInfo {
+            typ: VEImageViewType::View3D,
+            base_layer: 0,
+            layer_count: 1,
+            base_mipmap: 0,
+            mipmap_count: 1,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct VEImage {
     device: Arc<VEDevice>,
@@ -86,7 +130,7 @@ pub struct VEImage {
 
     allocation: Option<VESingleAllocation>,
     pub handle: vk::Image,
-    pub view: Option<vk::ImageView>,
+    views: HashMap<VEImageViewCreateInfo, vk::ImageView>,
 }
 
 impl Debug for VEImage {
@@ -119,6 +163,51 @@ impl VEImage {
 
         Ok(())
     }
+
+    pub fn get_view(&mut self, info: VEImageViewCreateInfo) -> Result<vk::ImageView, VEImageError> {
+        let existing = self.views.get(&info);
+        match existing {
+            Some(view) => Ok(view.clone()),
+            None => {
+                let image_view_create_info = vk::ImageViewCreateInfo::default()
+                    .image(self.handle)
+                    .view_type(match info.typ {
+                        VEImageViewType::View1D => vk::ImageViewType::TYPE_1D,
+                        VEImageViewType::View2D => vk::ImageViewType::TYPE_2D,
+                        VEImageViewType::View3D => vk::ImageViewType::TYPE_3D,
+                        VEImageViewType::ViewCube => vk::ImageViewType::CUBE,
+                        VEImageViewType::View1DArray => vk::ImageViewType::TYPE_1D_ARRAY,
+                        VEImageViewType::View2DArray => vk::ImageViewType::TYPE_2D_ARRAY,
+                        VEImageViewType::ViewCubeArray => vk::ImageViewType::CUBE_ARRAY,
+                    })
+                    .format(self.format)
+                    .subresource_range(
+                        vk::ImageSubresourceRange::default()
+                            .aspect_mask(self.aspect)
+                            .base_mip_level(info.base_mipmap)
+                            .level_count(info.mipmap_count)
+                            .base_array_layer(info.base_layer)
+                            .layer_count(info.layer_count),
+                    )
+                    .components(vk::ComponentMapping {
+                        r: vk::ComponentSwizzle::IDENTITY,
+                        g: vk::ComponentSwizzle::IDENTITY,
+                        b: vk::ComponentSwizzle::IDENTITY,
+                        a: vk::ComponentSwizzle::IDENTITY,
+                    });
+
+                let image_view_handle = unsafe {
+                    self.device
+                        .device
+                        .create_image_view(&image_view_create_info, None)
+                        .map_err(VEImageError::ImageViewCreationFailed)?
+                };
+
+                self.views.insert(info, image_view_handle.clone());
+                Ok(image_view_handle)
+            }
+        }
+    }
 }
 
 impl Drop for VEImage {
@@ -127,8 +216,8 @@ impl Drop for VEImage {
             // only free the ones that app allocated, not swapchain, for example
             // probably this should be handled differently
             unsafe {
-                if let Some(view) = self.view {
-                    self.device.device.destroy_image_view(view, None);
+                for view in self.views.iter() {
+                    self.device.device.destroy_image_view(*view.1, None);
                 }
                 self.device.device.destroy_image(self.handle, None);
             }
