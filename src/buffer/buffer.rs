@@ -1,9 +1,12 @@
+use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
+use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
+use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
-use ash::vk::{Buffer, BufferCreateInfo, SharingMode};
+use ash::vk::{Buffer, BufferCreateInfo, CommandBufferUsageFlags, SharingMode};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -21,6 +24,12 @@ pub enum VEBufferError {
     #[error("mapping failed")]
     MemoryManagerError(#[from] VEMemoryManagerError),
 
+    #[error("main device query error")]
+    MainDeviceQueueError(#[from] VEMainDeviceQueueError),
+
+    #[error("command buffer error")]
+    CommandBufferError(#[from] VECommandBufferError),
+
     #[error("no suitable memory type found")]
     NoSuitableMemoryTypeFound,
 }
@@ -36,6 +45,8 @@ pub enum VEBufferType {
 
 pub struct VEBuffer {
     device: Arc<VEDevice>,
+    queue: Arc<VEMainDeviceQueue>,
+    command_pool: Arc<VECommandPool>,
     memory_manager: Arc<Mutex<VEMemoryManager>>,
     allocation: VESingleAllocation,
     pub buffer: Buffer,
@@ -46,6 +57,8 @@ pub struct VEBuffer {
 impl VEBuffer {
     pub fn new(
         device: Arc<VEDevice>,
+        queue: Arc<VEMainDeviceQueue>,
+        command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         typ: VEBufferType,
         size: u64,
@@ -86,6 +99,8 @@ impl VEBuffer {
 
             Ok(VEBuffer {
                 device,
+                queue,
+                command_pool,
                 memory_manager,
                 buffer,
                 allocation,
@@ -109,6 +124,39 @@ impl VEBuffer {
             .map_err(|_| VEBufferError::LockingMemoryManagerFailed)?
             .unmap(&self.allocation)
             .map_err(VEBufferError::MemoryManagerError)
+    }
+
+    pub fn copy_to(
+        &self,
+        target: &VEBuffer,
+        src_offset: u64,
+        dst_offset: u64,
+        size: u64,
+    ) -> Result<(), VEBufferError> {
+        let command_buffer = VECommandBuffer::new(self.device.clone(), self.command_pool.clone())?;
+        //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        command_buffer.begin(CommandBufferUsageFlags::empty())?;
+
+        let region = vk::BufferCopy::default()
+            .size(size)
+            .src_offset(src_offset)
+            .dst_offset(dst_offset);
+
+        unsafe {
+            self.device.device.cmd_copy_buffer(
+                command_buffer.handle,
+                self.buffer,
+                target.buffer,
+                &[region],
+            );
+        }
+
+        command_buffer.end()?;
+
+        command_buffer.submit(&self.queue, vec![], vec![])?;
+        self.queue.wait_idle()?;
+
+        Ok(())
     }
 }
 

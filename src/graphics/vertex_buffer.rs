@@ -1,5 +1,7 @@
 use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
+use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
+use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::memory_properties::VEMemoryProperties;
 use crate::graphics::vertex_attributes::{get_vertex_attribute_type_byte_size, VertexAttribFormat};
 use crate::memory::memory_manager::VEMemoryManager;
@@ -45,6 +47,8 @@ impl VEVertexBuffer {
 
     pub fn from_file(
         device: Arc<VEDevice>,
+        queue: Arc<VEMainDeviceQueue>,
+        command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,
         vertex_attributes: &[VertexAttribFormat],
@@ -66,22 +70,40 @@ impl VEVertexBuffer {
 
         let vertex_count = file_size / vertex_size_bytes;
 
-        let mut buffer = VEBuffer::new(
+        let mut staging_buffer = VEBuffer::new(
             device.clone(),
+            queue.clone(),
+            command_pool.clone(),
             memory_manager.clone(),
             VEBufferType::Vertex,
             file_size as vk::DeviceSize,
             Some(VEMemoryProperties::HostCoherent),
         )?;
 
+        let mut final_buffer = VEBuffer::new(
+            device.clone(),
+            queue.clone(),
+            command_pool.clone(),
+            memory_manager.clone(),
+            VEBufferType::Vertex,
+            file_size as vk::DeviceSize,
+            Some(VEMemoryProperties::DeviceLocal),
+        )?;
+
         unsafe {
-            let mem = buffer.map()? as *mut u8;
+            let mem = staging_buffer.map()? as *mut u8;
             let mut slice = std::slice::from_raw_parts_mut(mem, file_size as usize);
             file.read_exact(&mut slice)
                 .map_err(VEVertexBufferError::ReadingFileFailed)?;
-            buffer.unmap()?;
+            staging_buffer.unmap()?;
         }
 
-        Ok(VEVertexBuffer::new(device.clone(), buffer, vertex_count))
+        staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
+
+        Ok(VEVertexBuffer::new(
+            device.clone(),
+            final_buffer,
+            vertex_count,
+        ))
     }
 }

@@ -290,6 +290,8 @@ impl VEToolkit {
     ) -> Result<VEBuffer, VEBufferError> {
         VEBuffer::new(
             self.device.clone(),
+            self.queue.clone(),
+            self.command_pool.clone(),
             self.memory_manager.clone(),
             typ,
             size,
@@ -308,6 +310,8 @@ impl VEToolkit {
     ) -> Result<VEVertexBuffer, VEVertexBufferError> {
         VEVertexBuffer::from_file(
             self.device.clone(),
+            self.queue.clone(),
+            self.command_pool.clone(),
             self.memory_manager.clone(),
             path,
             vertex_attributes,
