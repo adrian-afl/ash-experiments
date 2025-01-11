@@ -23,7 +23,7 @@ use crate::image::image_format::VEImageFormat;
 use crate::image::sampler::{VESampler, VESamplerAddressMode, VESamplerError};
 use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::{VESwapchain, VESwapchainError};
-use crate::window::window::{AppCallback, VEWindow};
+use crate::window::window::{AppCallback, VEWindow, VEWindowError};
 use ash::vk;
 use std::sync::{Arc, LockResult, Mutex};
 use std::{fs, io};
@@ -33,14 +33,20 @@ use winit::window::WindowAttributes;
 
 #[derive(Error, Debug)]
 pub enum VEToolkitError {
-    #[error("window error error")]
+    #[error("device error")]
     DeviceError(#[from] VEDeviceError),
+
+    #[error("window error")]
+    WindowError(#[from] VEWindowError),
 
     #[error("swapchain error")]
     SwapchainError(#[from] VESwapchainError),
 
     #[error("command pool error")]
     CommandPoolError(#[from] VECommandPoolError),
+
+    #[error("callbacks locking failed")]
+    CallbacksLockingFailed,
 }
 
 pub trait App {
@@ -66,8 +72,14 @@ impl AppCallback for VEToolkitCallbacks {
     fn on_window_ready(&mut self, toolkit: VEToolkit) {
         self.toolkit = Some(toolkit);
         let constructor = &self.create_app;
-        let app = constructor(self.toolkit.as_ref().unwrap());
-        self.app = Some(app);
+        let toolkit = self.toolkit.as_ref();
+        match toolkit {
+            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
+            Some(toolkit) => {
+                let app = constructor(toolkit);
+                self.app = Some(app);
+            }
+        }
     }
 
     fn on_window_draw(&self) {
@@ -99,8 +111,10 @@ impl AppCallback for VEToolkitCallbacks {
                     let swapchain = toolkit.swapchain.lock();
                     match swapchain {
                         Ok(mut swapchain) => match swapchain.recreate(new_size) {
-                            Ok(_) => ()
-                            Err(error) => println!("Cannot recreate Swapchain! Reason: {:?}", error),
+                            Ok(_) => (),
+                            Err(error) => {
+                                println!("Cannot recreate Swapchain! Reason: {:?}", error)
+                            }
                         },
                         Err(error) => println!("Cannot lock Swapchain! Reason: {:?}", error),
                     }
@@ -122,10 +136,13 @@ impl VEToolkit {
             app: None,
             create_app,
         }));
-        callbacks.lock().unwrap().window = Some(Arc::new(VEWindow::new(
+        callbacks
+            .lock()
+            .map_err(|_| VEToolkitError::CallbacksLockingFailed)?
+            .window = Some(Arc::new(VEWindow::new(
             callbacks.clone(),
             initial_window_attributes,
-        )));
+        )?));
         Ok(())
     }
 
@@ -163,7 +180,7 @@ impl VEToolkit {
         path: &str,
         typ: VEShaderModuleType,
     ) -> Result<VEShaderModule, VEShaderModuleError> {
-        VEShaderModule::new(self.device.clone(), &mut fs::File::open(path).unwrap(), typ)
+        VEShaderModule::from_file(self.device.clone(), path, typ)
     }
 
     pub fn make_descriptor_set_layout(

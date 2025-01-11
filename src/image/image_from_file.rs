@@ -17,7 +17,10 @@ impl VEImage {
         path: &str,
         usages: &[VEImageUsage],
     ) -> Result<VEImage, VEImageError> {
-        let img = ImageReader::open(path).unwrap().decode().unwrap();
+        let img = ImageReader::open(path)
+            .map_err(VEImageError::OpeningFileFailed)?
+            .decode()
+            .map_err(VEImageError::ImageDecodingFailed)?;
         let img = img.to_rgba8(); // error handling... TODO
                                   // let format = match img.color() {
                                   //     ColorType::L8 => vk::Format::R8_UNORM,

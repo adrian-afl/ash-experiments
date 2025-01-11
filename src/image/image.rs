@@ -7,6 +7,7 @@ use crate::image::transition_image_layout::transition_image_layout;
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::VEMemoryManagerError;
 use ash::vk;
+use image::ImageError;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::sync::Arc;
@@ -46,6 +47,9 @@ pub enum VEImageError {
 
     #[error("opening file failed")]
     OpeningFileFailed(#[source] io::Error),
+
+    #[error("image decoding failed")]
+    ImageDecodingFailed(#[source] ImageError),
 
     #[error("memory manager locking failed")]
     MemoryManagerLockingFailed,
