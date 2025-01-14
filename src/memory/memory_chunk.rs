@@ -4,7 +4,6 @@ use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, Memor
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::instrument;
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -43,7 +42,6 @@ impl Debug for VEMemoryChunk {
 }
 
 impl VEMemoryChunk {
-    #[instrument]
     pub fn new(
         device: Arc<VEDevice>,
         chunk_identifier: u64,
@@ -69,7 +67,6 @@ impl VEMemoryChunk {
         })
     }
 
-    #[instrument]
     pub fn free_allocation(&mut self, alloc_identifier: u64) {
         for i in 0..self.allocations.len() {
             if self.allocations[i].alloc_identifier == alloc_identifier {
@@ -79,7 +76,6 @@ impl VEMemoryChunk {
         }
     }
 
-    #[instrument]
     pub fn bind_buffer_memory(
         &mut self,
         buffer: Buffer,
@@ -105,7 +101,6 @@ impl VEMemoryChunk {
         Ok(allocation)
     }
 
-    #[instrument]
     pub fn bind_image_memory(
         &mut self,
         image: Image,
@@ -131,7 +126,6 @@ impl VEMemoryChunk {
         Ok(allocation)
     }
 
-    #[instrument]
     pub fn find_free_memory_offset(&self, size: u64) -> Option<u64> {
         if self.is_free_space(0, size) {
             return Some(0);
@@ -144,7 +138,6 @@ impl VEMemoryChunk {
         None
     }
 
-    #[instrument]
     fn is_free_space(&self, offset: u64, size: u64) -> bool {
         let end = offset + size;
         if end >= CHUNK_SIZE {
@@ -172,7 +165,6 @@ impl VEMemoryChunk {
         true
     }
 
-    #[instrument]
     pub fn map(
         &self,
         offset: u64,
@@ -186,7 +178,6 @@ impl VEMemoryChunk {
         }
     }
 
-    #[instrument]
     pub fn unmap(&self) {
         unsafe {
             self.device.device.unmap_memory(self.handle);
@@ -195,7 +186,6 @@ impl VEMemoryChunk {
 }
 
 impl Drop for VEMemoryChunk {
-    #[instrument]
     fn drop(&mut self) {
         unsafe { self.device.device.free_memory(self.handle, None) };
     }

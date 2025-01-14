@@ -27,7 +27,6 @@ impl VEAttachment {
         view: vk::ImageView,
         blending: Option<AttachmentBlending>,
         clear: Option<vk::ClearValue>,
-        for_present: bool,
     ) -> Result<VEAttachment, VEAttachmentError> {
         let description = vk::AttachmentDescription::default()
             .format(image.format)
@@ -41,9 +40,7 @@ impl VEAttachment {
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
             .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
             .initial_layout(image.current_layout)
-            .final_layout(if for_present {
-                vk::ImageLayout::PRESENT_SRC_KHR
-            } else if image.is_depth() {
+            .final_layout(if image.is_depth() {
                 vk::ImageLayout::GENERAL // TODO verify, its the final layout
             } else {
                 vk::ImageLayout::GENERAL

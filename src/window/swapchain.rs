@@ -11,7 +11,7 @@ use ash::vk::{CommandBufferUsageFlags, PresentInfoKHR, SwapchainKHR};
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tracing::{event, instrument, Level};
+use tracing::{event, Level};
 use winit::dpi::PhysicalSize;
 
 #[derive(Error, Debug)]
@@ -79,7 +79,6 @@ impl Debug for VESwapchain {
 }
 
 impl VESwapchain {
-    #[instrument]
     pub fn new(
         window: &VEWindow,
         device: Arc<VEDevice>,
@@ -214,7 +213,6 @@ impl VESwapchain {
         Ok((swapchain, swapchain_loader, present_images))
     }
 
-    #[instrument]
     pub fn recreate(&mut self, new_size: PhysicalSize<u32>) -> Result<(), VESwapchainError> {
         self.present_images.clear();
 
@@ -249,7 +247,6 @@ impl VESwapchain {
         Ok(())
     }
 
-    #[instrument]
     pub fn blit(
         &mut self,
         source: &VEImage,
@@ -340,7 +337,6 @@ impl VESwapchain {
         Ok(())
     }
 
-    #[instrument]
     fn present(
         &self,
         wait_handles: &[vk::Semaphore],
@@ -360,7 +356,6 @@ impl VESwapchain {
         Ok(())
     }
 
-    #[instrument]
     fn acquire_next_image(&mut self, semaphore: vk::Semaphore) -> Result<u32, VESwapchainError> {
         let result = unsafe {
             self.swapchain_loader

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::instrument;
 
 #[derive(Error, Debug)]
 pub enum VEMemoryManagerError {
@@ -39,7 +38,6 @@ impl Debug for VEMemoryManager {
 }
 
 impl VEMemoryManager {
-    #[instrument]
     pub fn new(device: Arc<VEDevice>) -> VEMemoryManager {
         VEMemoryManager {
             device,
@@ -49,7 +47,6 @@ impl VEMemoryManager {
         }
     }
 
-    #[instrument]
     pub fn bind_buffer_memory(
         &mut self,
         memory_type_index: u32,
@@ -60,7 +57,6 @@ impl VEMemoryManager {
         free.0.bind_buffer_memory(buffer, size, free.1)
     }
 
-    #[instrument]
     pub fn bind_image_memory(
         &mut self,
         memory_type_index: u32,
@@ -71,7 +67,6 @@ impl VEMemoryManager {
         free.0.bind_image_memory(image, size, free.1)
     }
 
-    #[instrument]
     fn find_free(
         &mut self,
         memory_type_index: u32,
@@ -98,7 +93,6 @@ impl VEMemoryManager {
         Ok((&mut chunks_for_type[last_index], 0))
     }
 
-    #[instrument]
     pub fn map(
         &mut self,
         allocation: &VESingleAllocation,
@@ -120,7 +114,6 @@ impl VEMemoryManager {
         Err(VEMemoryManagerError::NoAllocationFoundToMap)
     }
 
-    #[instrument]
     pub fn unmap(&mut self, allocation: &VESingleAllocation) -> Result<(), VEMemoryManagerError> {
         for chunks_for_type in self.chunks.values() {
             for chunk in chunks_for_type {
@@ -134,7 +127,6 @@ impl VEMemoryManager {
         Err(VEMemoryManagerError::NoAllocationFoundToUnmap)
     }
 
-    #[instrument]
     pub fn free_allocation(
         &mut self,
         allocation: &VESingleAllocation,

@@ -154,7 +154,6 @@ impl DingusApp {
             color_attachment_view,
             None,
             Some(clear_color_f32([0.0, 0.0, 1.0, 1.0])),
-            false,
         )
         .unwrap();
 
@@ -180,7 +179,6 @@ impl DingusApp {
             depth_attachment_view,
             None,
             Some(clear_depth(1.0)),
-            false,
         )
         .unwrap();
 
