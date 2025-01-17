@@ -199,8 +199,6 @@ impl VEToolkit {
         format: VEImageFormat,
 
         usages: &[VEImageUsage],
-
-        memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEImage, VEImageError> {
         VEImage::from_full(
             self.device.clone(),
@@ -212,7 +210,6 @@ impl VEToolkit {
             depth,
             format,
             usages,
-            memory_properties,
         )
     }
 
@@ -227,8 +224,6 @@ impl VEToolkit {
         format: VEImageFormat,
 
         usages: &[VEImageUsage],
-
-        memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEImage, VEImageError> {
         VEImage::from_data(
             self.device.clone(),
@@ -241,7 +236,6 @@ impl VEToolkit {
             depth,
             format,
             usages,
-            memory_properties,
         )
     }
 
@@ -314,6 +308,21 @@ impl VEToolkit {
             self.command_pool.clone(),
             self.memory_manager.clone(),
             path,
+            vertex_attributes,
+        )
+    }
+
+    pub fn create_vertex_buffer_from_data(
+        &self,
+        data: Vec<u8>,
+        vertex_attributes: &[VertexAttribFormat],
+    ) -> Result<VEVertexBuffer, VEVertexBufferError> {
+        VEVertexBuffer::from_data(
+            self.device.clone(),
+            self.queue.clone(),
+            self.command_pool.clone(),
+            self.memory_manager.clone(),
+            data,
             vertex_attributes,
         )
     }

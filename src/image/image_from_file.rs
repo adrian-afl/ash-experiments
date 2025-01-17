@@ -1,7 +1,6 @@
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
-use crate::core::memory_properties::VEMemoryProperties;
 use crate::image::image::{VEImage, VEImageError, VEImageUsage};
 use crate::image::image_format::VEImageFormat;
 use crate::memory::memory_manager::VEMemoryManager;
@@ -47,7 +46,6 @@ impl VEImage {
             1,
             format,
             usages,
-            Some(VEMemoryProperties::DeviceLocal),
         )
     }
 }

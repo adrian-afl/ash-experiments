@@ -41,8 +41,6 @@ impl VEImage {
         format: VEImageFormat,
 
         usages: &[VEImageUsage],
-
-        memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEImage, VEImageError> {
         let format = get_image_format(format);
         let aspect = aspect_from_format(format);
@@ -81,7 +79,7 @@ impl VEImage {
         let mem_reqs = unsafe { device.device.get_image_memory_requirements(image_handle) };
         let mem_index = device.find_memory_type(
             mem_reqs.memory_type_bits,
-            get_memory_properties_flags(memory_properties),
+            get_memory_properties_flags(Some(VEMemoryProperties::DeviceLocal)),
         );
 
         let allocation = match mem_index {

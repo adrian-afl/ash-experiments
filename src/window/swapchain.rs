@@ -280,7 +280,7 @@ impl VESwapchain {
             .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL)?;
 
         self.present_command_buffer
-            .begin(CommandBufferUsageFlags::SIMULTANEOUS_USE)?; // TODO try to remove this flag
+            .begin(CommandBufferUsageFlags::empty())?; // TODO try to remove this flag
 
         let region = vk::ImageBlit::default()
             .src_subresource(

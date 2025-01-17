@@ -62,8 +62,7 @@ impl VECommandBuffer {
     }
 
     pub fn begin(&self, flags: CommandBufferUsageFlags) -> Result<(), VECommandBufferError> {
-        let begin_info = vk::CommandBufferBeginInfo::default()
-            .flags(flags | CommandBufferUsageFlags::SIMULTANEOUS_USE);
+        let begin_info = vk::CommandBufferBeginInfo::default().flags(flags);
 
         unsafe {
             self.device

@@ -141,7 +141,6 @@ impl DingusApp {
                 1,
                 VEImageFormat::RGBA32f,
                 &[VEImageUsage::ColorAttachment, VEImageUsage::TransferSource],
-                None,
             )
             .unwrap();
 
@@ -166,7 +165,6 @@ impl DingusApp {
                 1,
                 VEImageFormat::Depth32f,
                 &[VEImageUsage::DepthAttachment],
-                None,
             )
             .unwrap();
 

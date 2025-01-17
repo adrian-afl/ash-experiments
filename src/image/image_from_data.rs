@@ -27,8 +27,6 @@ impl VEImage {
         format: VEImageFormat,
 
         usages: &[VEImageUsage],
-
-        memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEImage, VEImageError> {
         let mut usages = usages.to_vec();
         usages.push(VEImageUsage::TransferDestination);
@@ -42,7 +40,6 @@ impl VEImage {
             depth,
             format,
             usages.as_slice(),
-            memory_properties,
         )?;
 
         let mut staging_buffer = VEBuffer::new(

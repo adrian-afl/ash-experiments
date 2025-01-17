@@ -45,6 +45,63 @@ impl VEVertexBuffer {
         }
     }
 
+    pub fn from_data(
+        device: Arc<VEDevice>,
+        queue: Arc<VEMainDeviceQueue>,
+        command_pool: Arc<VECommandPool>,
+        memory_manager: Arc<Mutex<VEMemoryManager>>,
+        data: Vec<u8>,
+        vertex_attributes: &[VertexAttribFormat],
+    ) -> Result<VEVertexBuffer, VEVertexBufferError> {
+        let vertex_size_bytes: u32 = vertex_attributes
+            .iter()
+            .map(|a| get_vertex_attribute_type_byte_size(a))
+            .sum();
+
+        let input_size = data.len() as u32;
+
+        if input_size % vertex_size_bytes != 0 {
+            return Err(VEVertexBufferError::VertexSizeMismatch);
+        }
+
+        let vertex_count = input_size / vertex_size_bytes;
+
+        let mut staging_buffer = VEBuffer::new(
+            device.clone(),
+            queue.clone(),
+            command_pool.clone(),
+            memory_manager.clone(),
+            VEBufferType::Vertex,
+            input_size as vk::DeviceSize,
+            Some(VEMemoryProperties::HostCoherent),
+        )?;
+
+        let final_buffer = VEBuffer::new(
+            device.clone(),
+            queue.clone(),
+            command_pool.clone(),
+            memory_manager.clone(),
+            VEBufferType::Vertex,
+            input_size as vk::DeviceSize,
+            Some(VEMemoryProperties::DeviceLocal),
+        )?;
+
+        unsafe {
+            let mem = staging_buffer.map()? as *mut u8;
+            let mut slice = std::slice::from_raw_parts_mut(mem, input_size as usize);
+            slice.copy_from_slice(&data);
+            staging_buffer.unmap()?;
+        }
+
+        staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
+
+        Ok(VEVertexBuffer::new(
+            device.clone(),
+            final_buffer,
+            vertex_count,
+        ))
+    }
+
     pub fn from_file(
         device: Arc<VEDevice>,
         queue: Arc<VEMainDeviceQueue>,
