@@ -70,6 +70,7 @@ impl VEMemoryChunk {
     pub fn free_allocation(&mut self, alloc_identifier: u64) {
         for i in 0..self.allocations.len() {
             if self.allocations[i].alloc_identifier == alloc_identifier {
+                println!("FREEING offset {}!", self.allocations[i].offset);
                 self.allocations.remove(i);
                 return;
             }
@@ -128,41 +129,32 @@ impl VEMemoryChunk {
 
     pub fn find_free_memory_offset(&self, size: u64) -> Option<u64> {
         if self.is_free_space(0, size) {
+            println!("Zero is free! Amazing");
             return Some(0);
         }
         for a in &self.allocations {
-            if self.is_free_space(a.offset, a.offset + size) {
-                return Some(a.offset + size);
+            if self.is_free_space(a.offset + a.size + 0x1000, size) {
+                println!("offset {} is free!", a.offset);
+                return Some(a.offset + a.size + 0x1000);
             }
         }
         None
     }
 
     fn is_free_space(&self, offset: u64, size: u64) -> bool {
-        let end = offset + size;
-        if end >= CHUNK_SIZE {
-            return false;
-        }
-        for a in &self.allocations {
-            let allocation_end = a.offset + a.size;
-            if offset >= a.offset && offset < allocation_end {
-                // if start of alloc collides
-                return false;
-            }
-            if end >= a.offset && end < allocation_end {
-                // if end of alloc collides
-                return false;
-            }
-            if offset <= a.offset && end > allocation_end {
-                // if alloc contains element
-                return false;
-            }
-            if offset >= a.offset && end < allocation_end {
-                // if elements contains alloc
-                return false;
+        // Check for overflow and bounds
+        match offset.checked_add(size) {
+            None => false,                          // Integer overflow
+            Some(end) if end > CHUNK_SIZE => false, // Out of bounds
+            Some(end) => {
+                // Check for overlap with any existing allocation
+                // Two ranges overlap if the start of one range is before the end of the other
+                !self.allocations.iter().any(|alloc| {
+                    let alloc_end = alloc.offset + alloc.size;
+                    offset < alloc_end && alloc.offset < end
+                })
             }
         }
-        true
     }
 
     pub fn map(
