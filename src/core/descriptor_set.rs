@@ -79,7 +79,7 @@ impl VEDescriptorSet {
             .offset(0)
             .range(buffer.size)];
         let is_usage_uniform = buffer.usage.contains(&VEBufferUsage::Uniform);
-        let is_usage_storage = buffer.usage.contains(&VEBufferUsage::Uniform);
+        let is_usage_storage = buffer.usage.contains(&VEBufferUsage::Storage);
         let typ = if is_usage_uniform {
             Ok(vk::DescriptorType::UNIFORM_BUFFER)
         } else if is_usage_storage {
