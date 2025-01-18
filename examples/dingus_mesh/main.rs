@@ -27,8 +27,8 @@ fn main() {
         .with_title("dingus_mesh");
 
     VEToolkit::start(
-        Box::from(|toolkit: &VEToolkit| {
-            let app = DingusApp::new(&toolkit);
+        Box::from(|toolkit: Arc<VEToolkit>| {
+            let app = DingusApp::new(toolkit);
             Arc::new(Mutex::from(app)) as Arc<Mutex<dyn App>>
         }),
         window_attributes,

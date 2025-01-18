@@ -20,7 +20,7 @@ pub enum VEWindowError {
 }
 
 pub trait AppCallback {
-    fn on_window_ready(&mut self, toolkit: VEToolkit);
+    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>);
     fn on_window_draw(&self);
     fn on_window_resize(&self, new_size: PhysicalSize<u32>);
 }
@@ -131,6 +131,7 @@ impl VEWindow {
         let toolkit = VEToolkit::new(self);
         match toolkit {
             Ok(toolkit) => {
+                let toolkit = Arc::new(toolkit);
                 let locked_app = self.app.lock();
                 match locked_app {
                     Ok(mut app) => {

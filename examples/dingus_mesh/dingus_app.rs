@@ -52,8 +52,8 @@ struct Mesh {
 
 #[allow(clippy::unwrap_used)]
 impl DingusApp {
-    pub fn new(toolkit: &VEToolkit) -> DingusApp {
-        let mesh_stage = Self::create_mesh_stage(toolkit);
+    pub fn new(toolkit: Arc<VEToolkit>) -> DingusApp {
+        let mesh_stage = Self::create_mesh_stage(&toolkit);
 
         let mut scheduler = toolkit.create_scheduler(2);
 
@@ -76,7 +76,7 @@ impl DingusApp {
         };
 
         let dingus = app.create_mesh(
-            toolkit,
+            &toolkit,
             "examples/dingus_mesh/dingus.jpg",
             "examples/dingus_mesh/dingus.raw",
         );
@@ -263,7 +263,7 @@ impl DingusApp {
 
 #[allow(clippy::unwrap_used)]
 impl App for DingusApp {
-    fn draw(&mut self, toolkit: &VEToolkit) {
+    fn draw(&mut self) {
         let pointer = self.mesh_stage.uniform_buffer.map().unwrap() as *mut f32;
         unsafe {
             pointer.write(self.elapsed);

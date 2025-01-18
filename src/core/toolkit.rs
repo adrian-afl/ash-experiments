@@ -50,7 +50,7 @@ pub enum VEToolkitError {
 }
 
 pub trait App {
-    fn draw(&mut self, toolkit: &VEToolkit);
+    fn draw(&mut self);
 }
 
 pub struct VEToolkit {
@@ -62,21 +62,21 @@ pub struct VEToolkit {
 }
 
 pub struct VEToolkitCallbacks {
-    toolkit: Option<VEToolkit>,
+    toolkit: Option<Arc<VEToolkit>>,
     pub window: Option<Arc<VEWindow>>,
-    create_app: Box<dyn Fn(&VEToolkit) -> Arc<Mutex<dyn App>>>,
+    create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
     app: Option<Arc<Mutex<dyn App>>>,
 }
 
 impl AppCallback for VEToolkitCallbacks {
-    fn on_window_ready(&mut self, toolkit: VEToolkit) {
+    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>) {
         self.toolkit = Some(toolkit);
         let constructor = &self.create_app;
         let toolkit = self.toolkit.as_ref();
         match toolkit {
             None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
             Some(toolkit) => {
-                let app = constructor(toolkit);
+                let app = constructor(toolkit.clone());
                 self.app = Some(app);
             }
         }
@@ -93,7 +93,7 @@ impl AppCallback for VEToolkitCallbacks {
                         let toolkit = self.toolkit.as_ref();
                         match toolkit {
                             None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
-                            Some(toolkit) => app.draw(toolkit),
+                            Some(toolkit) => app.draw(),
                         }
                     }
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
@@ -127,7 +127,7 @@ impl AppCallback for VEToolkitCallbacks {
 
 impl VEToolkit {
     pub fn start(
-        create_app: Box<dyn Fn(&VEToolkit) -> Arc<Mutex<dyn App>>>,
+        create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
         initial_window_attributes: WindowAttributes,
     ) -> Result<(), VEToolkitError> {
         let callbacks = Arc::new(Mutex::from(VEToolkitCallbacks {

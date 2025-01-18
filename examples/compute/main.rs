@@ -18,7 +18,7 @@ struct ComputeApp {}
 
 #[allow(clippy::unwrap_used)]
 impl ComputeApp {
-    pub fn calculate(toolkit: &VEToolkit) -> ComputeApp {
+    pub fn calculate(toolkit: Arc<VEToolkit>) -> ComputeApp {
         let mut buffer = toolkit
             .create_buffer(
                 VEBufferType::Storage,
@@ -79,7 +79,7 @@ impl ComputeApp {
 }
 
 impl App for ComputeApp {
-    fn draw(&mut self, toolkit: &VEToolkit) {}
+    fn draw(&mut self) {}
 }
 
 #[allow(clippy::unwrap_used)]
@@ -99,8 +99,8 @@ fn main() {
         .with_title("compute");
 
     VEToolkit::start(
-        Box::from(|toolkit: &VEToolkit| {
-            let app = ComputeApp::calculate(&toolkit);
+        Box::from(|toolkit: Arc<VEToolkit>| {
+            let app = ComputeApp::calculate(toolkit);
             Arc::new(Mutex::from(app)) as Arc<Mutex<dyn App>>
         }),
         window_attributes,
