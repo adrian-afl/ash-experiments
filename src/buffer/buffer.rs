@@ -3,6 +3,7 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
+use crate::image::image::VEImageUsage;
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
@@ -34,8 +35,8 @@ pub enum VEBufferError {
     NoSuitableMemoryTypeFound,
 }
 
-#[derive(Debug)]
-pub enum VEBufferType {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VEBufferUsage {
     Uniform,
     Storage,
     TransferSource,
@@ -51,7 +52,23 @@ pub struct VEBuffer {
     allocation: VESingleAllocation,
     pub buffer: Buffer,
     pub size: u64,
-    pub typ: VEBufferType,
+    pub usage: Vec<VEBufferUsage>,
+}
+
+fn get_buffer_usage_flags(usages: &[VEBufferUsage]) -> vk::BufferUsageFlags {
+    let mut flags = vk::BufferUsageFlags::empty();
+    for usage in usages {
+        match usage {
+            VEBufferUsage::Uniform => flags = flags | vk::BufferUsageFlags::UNIFORM_BUFFER,
+            VEBufferUsage::Storage => flags = flags | vk::BufferUsageFlags::STORAGE_BUFFER,
+            VEBufferUsage::TransferSource => flags = flags | vk::BufferUsageFlags::TRANSFER_SRC,
+            VEBufferUsage::TransferDestination => {
+                flags = flags | vk::BufferUsageFlags::TRANSFER_DST
+            }
+            VEBufferUsage::Vertex => flags = flags | vk::BufferUsageFlags::VERTEX_BUFFER,
+        }
+    }
+    flags
 }
 
 impl VEBuffer {
@@ -60,24 +77,17 @@ impl VEBuffer {
         queue: Arc<VEMainDeviceQueue>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
-        typ: VEBufferType,
+        usage: &[VEBufferUsage],
         size: u64,
         memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEBuffer, VEBufferError> {
-        let usage = match typ {
-            VEBufferType::Uniform => vk::BufferUsageFlags::UNIFORM_BUFFER,
-            VEBufferType::Storage => vk::BufferUsageFlags::STORAGE_BUFFER,
-            VEBufferType::TransferSource => vk::BufferUsageFlags::TRANSFER_SRC,
-            VEBufferType::TransferDestination => vk::BufferUsageFlags::TRANSFER_DST,
-            VEBufferType::Vertex => vk::BufferUsageFlags::VERTEX_BUFFER,
-        };
         unsafe {
             let buffer = device
                 .device
                 .create_buffer(
                     &BufferCreateInfo::default()
                         .size(size)
-                        .usage(usage)
+                        .usage(get_buffer_usage_flags(usage))
                         .sharing_mode(SharingMode::EXCLUSIVE),
                     None,
                 )
@@ -105,7 +115,7 @@ impl VEBuffer {
                 buffer,
                 allocation,
                 size,
-                typ,
+                usage: usage.to_vec(),
             })
         }
     }

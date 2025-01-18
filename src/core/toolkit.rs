@@ -1,4 +1,4 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
+use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferUsage};
 use crate::compute::compute_stage::{VEComputeStage, VEComputeStageError};
 use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::{VECommandPool, VECommandPoolError};
@@ -278,7 +278,7 @@ impl VEToolkit {
 
     pub fn create_buffer(
         &self,
-        typ: VEBufferType,
+        usage: &[VEBufferUsage],
         size: vk::DeviceSize,
         memory_properties: Option<VEMemoryProperties>,
     ) -> Result<VEBuffer, VEBufferError> {
@@ -287,7 +287,7 @@ impl VEToolkit {
             self.queue.clone(),
             self.command_pool.clone(),
             self.memory_manager.clone(),
-            typ,
+            usage,
             size,
             memory_properties,
         )

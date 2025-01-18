@@ -1,4 +1,4 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
+use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferUsage};
 use crate::core::device::VEDevice;
 use crate::image::image::{VEImage, VEImageViewCreateInfo};
 use crate::image::sampler::VESampler;
@@ -78,10 +78,14 @@ impl VEDescriptorSet {
             .buffer(buffer.buffer)
             .offset(0)
             .range(buffer.size)];
-        let typ = match buffer.typ {
-            VEBufferType::Uniform => Ok(vk::DescriptorType::UNIFORM_BUFFER),
-            VEBufferType::Storage => Ok(vk::DescriptorType::STORAGE_BUFFER),
-            _ => Err(VEDescriptorSetError::InvalidBufferType),
+        let is_usage_uniform = buffer.usage.contains(&VEBufferUsage::Uniform);
+        let is_usage_storage = buffer.usage.contains(&VEBufferUsage::Uniform);
+        let typ = if is_usage_uniform {
+            Ok(vk::DescriptorType::UNIFORM_BUFFER)
+        } else if is_usage_storage {
+            Ok(vk::DescriptorType::STORAGE_BUFFER)
+        } else {
+            Err(VEDescriptorSetError::InvalidBufferType)
         }?;
         Ok(self.write(
             vk::WriteDescriptorSet::default()

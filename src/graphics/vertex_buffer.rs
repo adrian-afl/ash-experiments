@@ -1,4 +1,4 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferType};
+use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferUsage};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
@@ -71,7 +71,7 @@ impl VEVertexBuffer {
             queue.clone(),
             command_pool.clone(),
             memory_manager.clone(),
-            VEBufferType::Vertex,
+            &[VEBufferUsage::TransferSource],
             input_size as vk::DeviceSize,
             Some(VEMemoryProperties::HostCoherent),
         )?;
@@ -81,7 +81,7 @@ impl VEVertexBuffer {
             queue.clone(),
             command_pool.clone(),
             memory_manager.clone(),
-            VEBufferType::Vertex,
+            &[VEBufferUsage::Vertex, VEBufferUsage::TransferDestination],
             input_size as vk::DeviceSize,
             Some(VEMemoryProperties::DeviceLocal),
         )?;
@@ -132,7 +132,7 @@ impl VEVertexBuffer {
             queue.clone(),
             command_pool.clone(),
             memory_manager.clone(),
-            VEBufferType::Vertex,
+            &[VEBufferUsage::TransferSource],
             file_size as vk::DeviceSize,
             Some(VEMemoryProperties::HostCoherent),
         )?;
@@ -142,7 +142,7 @@ impl VEVertexBuffer {
             queue.clone(),
             command_pool.clone(),
             memory_manager.clone(),
-            VEBufferType::Vertex,
+            &[VEBufferUsage::Vertex, VEBufferUsage::TransferDestination],
             file_size as vk::DeviceSize,
             Some(VEMemoryProperties::DeviceLocal),
         )?;

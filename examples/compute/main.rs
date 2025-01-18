@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::FmtSubscriber;
-use vengine_rs::buffer::buffer::VEBufferType;
+use vengine_rs::buffer::buffer::VEBufferUsage;
 use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
 };
@@ -21,7 +21,7 @@ impl ComputeApp {
     pub fn calculate(toolkit: Arc<VEToolkit>) -> ComputeApp {
         let mut buffer = toolkit
             .create_buffer(
-                VEBufferType::Storage,
+                &[VEBufferUsage::Storage],
                 128,
                 Some(VEMemoryProperties::HostCoherent),
             )

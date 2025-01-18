@@ -1,4 +1,4 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferType};
+use crate::buffer::buffer::{VEBuffer, VEBufferUsage};
 use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
@@ -47,7 +47,7 @@ impl VEImage {
             queue.clone(),
             command_pool.clone(),
             memory_manager.clone(),
-            VEBufferType::TransferSource,
+            &[VEBufferUsage::TransferSource],
             data.len() as vk::DeviceSize,
             Some(VEMemoryProperties::HostCoherent),
         )?;

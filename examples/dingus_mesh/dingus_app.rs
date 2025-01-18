@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use vengine_rs::buffer::buffer::{VEBuffer, VEBufferType};
+use vengine_rs::buffer::buffer::{VEBuffer, VEBufferUsage};
 use vengine_rs::core::descriptor_set::VEDescriptorSet;
 use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
@@ -122,7 +122,7 @@ impl DingusApp {
 
         let uniform_buffer = toolkit
             .create_buffer(
-                VEBufferType::Uniform,
+                &[VEBufferUsage::Uniform],
                 128,
                 Some(VEMemoryProperties::HostCoherent),
             )
