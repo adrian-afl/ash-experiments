@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
+use tracing::{event, Level};
 
 #[derive(Error, Debug)]
 pub enum VEMemoryManagerError {
@@ -55,7 +56,12 @@ impl VEMemoryManager {
     ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         let size = size + (0x1000 - (size % 0x1000));
         let free = self.find_free(memory_type_index, size)?;
-        println!("Binding buffer to offset {} size {}", free.1, size);
+        event!(
+            Level::TRACE,
+            "Binding buffer to offset {} size {}",
+            free.1,
+            size
+        );
         free.0.bind_buffer_memory(buffer, size, free.1)
     }
 
@@ -67,7 +73,12 @@ impl VEMemoryManager {
     ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         let size = size + (0x1000 - (size % 0x1000));
         let free = self.find_free(memory_type_index, size)?;
-        println!("Binding image to offset {} size {}", free.1, size);
+        event!(
+            Level::TRACE,
+            "Binding image to offset {} size {}",
+            free.1,
+            size
+        );
         free.0.bind_image_memory(image, size, free.1)
     }
 
@@ -80,11 +91,14 @@ impl VEMemoryManager {
 
         for i in 0..chunks_for_type.len() {
             if let Some(offset) = chunks_for_type[i].find_free_memory_offset(size) {
-                println!("Free memory found! type {memory_type_index}");
+                event!(Level::TRACE, "Free memory found! type {memory_type_index}");
                 return Ok((&mut chunks_for_type[i], offset));
             }
         }
-        println!("Free memory NOT found! type {memory_type_index}");
+        event!(
+            Level::TRACE,
+            "Free memory NOT found! type {memory_type_index}"
+        );
 
         // no suitable chunk found, allocate
         self.identifier_counter += 1;
