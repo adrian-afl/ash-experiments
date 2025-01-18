@@ -76,9 +76,11 @@ impl VEMemoryManager {
 
         for i in 0..chunks_for_type.len() {
             if let Some(offset) = chunks_for_type[i].find_free_memory_offset(size) {
+                println!("Free memory found!");
                 return Ok((&mut chunks_for_type[i], offset));
             }
         }
+        println!("Free memory NOT found!");
 
         // no suitable chunk found, allocate
         self.identifier_counter += 1;
