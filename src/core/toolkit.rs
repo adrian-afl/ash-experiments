@@ -54,7 +54,7 @@ pub trait App {
 }
 
 pub struct VEToolkit {
-    device: Arc<VEDevice>,
+    pub device: Arc<VEDevice>,
     pub swapchain: Arc<Mutex<VESwapchain>>,
     pub queue: Arc<VEMainDeviceQueue>, // TODO maybe this could be made private
     command_pool: Arc<VECommandPool>,
