@@ -67,11 +67,19 @@ impl VEGraphicsPipeline {
             .topology(primitive_topology)
             .primitive_restart_enable(false);
 
+        // let viewport = vk::Viewport::default()
+        //     .x(0.0)
+        //     .y(viewport_height as f32)
+        //     .width(viewport_width as f32)
+        //     .height(-(viewport_height as f32))
+        //     .min_depth(0.0)
+        //     .max_depth(1.0);
+
         let viewport = vk::Viewport::default()
             .x(0.0)
-            .y(viewport_height as f32)
+            .y(0.0)
             .width(viewport_width as f32)
-            .height(-(viewport_height as f32))
+            .height(viewport_height as f32)
             .min_depth(0.0)
             .max_depth(1.0);
 
