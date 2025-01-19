@@ -18,6 +18,7 @@ use vengine_rs::image::filtering::VEFiltering;
 use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo};
 use vengine_rs::image::image_format::VEImageFormat;
 use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 
 pub struct DingusApp {
     scheduler: VEScheduler,
@@ -292,4 +293,8 @@ impl App for DingusApp {
 
         self.elapsed += 0.001;
     }
+
+    fn on_window_event(&self, event: WindowEvent) {}
+
+    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
 }

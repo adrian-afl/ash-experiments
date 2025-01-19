@@ -29,6 +29,7 @@ use std::sync::{Arc, LockResult, Mutex};
 use std::{fs, io};
 use thiserror::Error;
 use winit::dpi::PhysicalSize;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::WindowAttributes;
 
 #[derive(Error, Debug)]
@@ -51,6 +52,8 @@ pub enum VEToolkitError {
 
 pub trait App {
     fn draw(&mut self);
+    fn on_window_event(&self, event: WindowEvent);
+    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent);
 }
 
 pub struct VEToolkit {
@@ -121,6 +124,38 @@ impl AppCallback for VEToolkitCallbacks {
                 }
                 Err(error) => println!("Cannot wait idle on Device! Reason: {:?}", error),
             },
+        }
+    }
+
+    fn on_window_event(&self, event: WindowEvent) {
+        let app = self.app.as_ref();
+        match app {
+            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            Some(app) => {
+                let app = app.lock();
+                match app {
+                    Ok(mut app) => {
+                        app.on_window_event(event);
+                    }
+                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                }
+            }
+        }
+    }
+
+    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {
+        let app = self.app.as_ref();
+        match app {
+            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            Some(app) => {
+                let app = app.lock();
+                match app {
+                    Ok(mut app) => {
+                        app.on_device_event(device_id, event);
+                    }
+                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                }
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ use vengine_rs::core::memory_properties::VEMemoryProperties;
 use vengine_rs::core::shader_module::VEShaderModuleType;
 use vengine_rs::core::toolkit::{App, VEToolkit};
 use winit::dpi::PhysicalSize;
+use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::WindowAttributes;
 
 struct ComputeApp {}
@@ -80,6 +81,8 @@ impl ComputeApp {
 
 impl App for ComputeApp {
     fn draw(&mut self) {}
+    fn on_window_event(&self, event: WindowEvent) {}
+    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
 }
 
 #[allow(clippy::unwrap_used)]

@@ -23,6 +23,9 @@ pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>);
     fn on_window_draw(&self);
     fn on_window_resize(&self, new_size: PhysicalSize<u32>);
+
+    fn on_window_event(&self, event: WindowEvent);
+    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent);
 }
 
 pub struct VEWindow {
@@ -90,7 +93,15 @@ impl ApplicationHandler for VEWindow {
                         Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
                     };
                 }
-                _ => (),
+                _ => {
+                    let locked_app = self.app.lock();
+                    match locked_app {
+                        Ok(app) => {
+                            app.on_window_event(event);
+                        }
+                        Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    };
+                }
             },
         }
     }
@@ -101,7 +112,13 @@ impl ApplicationHandler for VEWindow {
         device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        // println!("{:?}, {:?}", device_id, event);
+        let locked_app = self.app.lock();
+        match locked_app {
+            Ok(app) => {
+                app.on_device_event(device_id, event);
+            }
+            Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+        };
     }
 }
 
