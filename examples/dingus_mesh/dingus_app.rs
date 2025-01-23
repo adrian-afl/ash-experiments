@@ -19,6 +19,7 @@ use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo};
 use vengine_rs::image::image_format::VEImageFormat;
 use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
+use winit::window::Window;
 
 pub struct DingusApp {
     scheduler: VEScheduler,
@@ -264,7 +265,7 @@ impl DingusApp {
 
 #[allow(clippy::unwrap_used)]
 impl App for DingusApp {
-    fn draw(&mut self) {
+    fn draw(&mut self, window: &mut Window) {
         let pointer = self.mesh_stage.uniform_buffer.map().unwrap() as *mut f32;
         unsafe {
             pointer.write(self.elapsed);
@@ -292,6 +293,8 @@ impl App for DingusApp {
         self.scheduler.run().unwrap();
 
         self.elapsed += 0.001;
+
+        window.set_title(format!("{}", self.elapsed).as_str());
     }
 
     fn on_window_event(&self, event: WindowEvent) {}

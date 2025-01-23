@@ -21,7 +21,7 @@ pub enum VEWindowError {
 
 pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>);
-    fn on_window_draw(&self);
+    fn on_window_draw(&self, window: &mut Window);
     fn on_window_resize(&self, new_size: PhysicalSize<u32>);
 
     fn on_window_event(&self, event: WindowEvent);
@@ -65,7 +65,7 @@ impl ApplicationHandler for VEWindow {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        let window = self.window.as_ref();
+        let window = self.window.as_mut();
         match window {
             None => println!("Completely unexpected problem that window is None"),
             Some(window) => match event {
@@ -78,7 +78,7 @@ impl ApplicationHandler for VEWindow {
                     let locked_app = self.app.lock();
                     match locked_app {
                         Ok(app) => {
-                            app.on_window_draw();
+                            app.on_window_draw(window);
                             window.request_redraw();
                         }
                         Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),

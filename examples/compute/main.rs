@@ -13,7 +13,7 @@ use vengine_rs::core::shader_module::VEShaderModuleType;
 use vengine_rs::core::toolkit::{App, VEToolkit};
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
-use winit::window::WindowAttributes;
+use winit::window::{Window, WindowAttributes};
 
 struct ComputeApp {}
 
@@ -80,7 +80,7 @@ impl ComputeApp {
 }
 
 impl App for ComputeApp {
-    fn draw(&mut self) {}
+    fn draw(&mut self, window: &mut Window) {}
     fn on_window_event(&self, event: WindowEvent) {}
     fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
 }
