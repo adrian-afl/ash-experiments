@@ -22,10 +22,10 @@ pub enum VEWindowError {
 pub trait AppCallback {
     fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>, window: Arc<Mutex<Window>>);
     fn on_window_draw(&self);
-    fn on_window_resize(&self, new_size: PhysicalSize<u32>);
+    fn on_window_resize(&mut self, new_size: PhysicalSize<u32>);
 
-    fn on_window_event(&self, event: WindowEvent);
-    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent);
+    fn on_window_event(&mut self, event: WindowEvent);
+    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent);
 }
 
 pub struct VEWindow {
@@ -112,7 +112,7 @@ impl ApplicationHandler for VEWindow {
                 WindowEvent::Resized(new_size) => {
                     let locked_app = self.app.lock();
                     match locked_app {
-                        Ok(app) => {
+                        Ok(mut app) => {
                             app.on_window_resize(new_size);
                         }
                         Err(error) => {
@@ -123,7 +123,7 @@ impl ApplicationHandler for VEWindow {
                 _ => {
                     let locked_app = self.app.lock();
                     match locked_app {
-                        Ok(app) => {
+                        Ok(mut app) => {
                             app.on_window_event(event);
                         }
                         Err(error) => {
@@ -143,7 +143,7 @@ impl ApplicationHandler for VEWindow {
     ) {
         let locked_app = self.app.lock();
         match locked_app {
-            Ok(app) => {
+            Ok(mut app) => {
                 app.on_device_event(device_id, event);
             }
             Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),

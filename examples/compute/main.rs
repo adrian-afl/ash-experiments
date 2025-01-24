@@ -81,8 +81,8 @@ impl ComputeApp {
 
 impl App for ComputeApp {
     fn draw(&mut self) {}
-    fn on_window_event(&self, event: WindowEvent) {}
-    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
+    fn on_window_event(&mut self, event: WindowEvent) {}
+    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {}
 }
 
 #[allow(clippy::unwrap_used)]

@@ -51,8 +51,8 @@ pub enum VEToolkitError {
 
 pub trait App {
     fn draw(&mut self);
-    fn on_window_event(&self, event: WindowEvent);
-    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent);
+    fn on_window_event(&mut self, event: WindowEvent);
+    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent);
 }
 
 pub struct VEToolkit {
@@ -97,7 +97,7 @@ impl AppCallback for VEToolkitCallbacks {
         }
     }
 
-    fn on_window_resize(&self, new_size: PhysicalSize<u32>) {
+    fn on_window_resize(&mut self, new_size: PhysicalSize<u32>) {
         let toolkit = self.toolkit.as_ref();
         match toolkit {
             None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
@@ -119,14 +119,14 @@ impl AppCallback for VEToolkitCallbacks {
         }
     }
 
-    fn on_window_event(&self, event: WindowEvent) {
+    fn on_window_event(&mut self, event: WindowEvent) {
         let app = self.app.as_ref();
         match app {
             None => println!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
-                    Ok(app) => {
+                    Ok(mut app) => {
                         app.on_window_event(event);
                     }
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
@@ -135,14 +135,14 @@ impl AppCallback for VEToolkitCallbacks {
         }
     }
 
-    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {
+    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
         let app = self.app.as_ref();
         match app {
             None => println!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
-                    Ok(app) => {
+                    Ok(mut app) => {
                         app.on_device_event(device_id, event);
                     }
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),

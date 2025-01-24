@@ -303,7 +303,7 @@ impl App for DingusApp {
             .set_title(format!("{}", self.elapsed).as_str());
     }
 
-    fn on_window_event(&self, event: WindowEvent) {}
+    fn on_window_event(&mut self, event: WindowEvent) {}
 
-    fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
+    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {}
 }
