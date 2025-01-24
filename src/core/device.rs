@@ -21,6 +21,9 @@ pub enum VEDeviceError {
     #[error("no winit window found")]
     NoWinitWindowFound,
 
+    #[error("window locking failed")]
+    WindowLockingFailed,
+
     #[error("no winit display handle")]
     NoWinitDisplayHandle(#[source] HandleError),
 
@@ -109,7 +112,10 @@ impl VEDevice {
         let winit_window = window
             .window
             .as_ref()
-            .ok_or(VEDeviceError::NoWinitWindowFound)?;
+            .ok_or(VEDeviceError::NoWinitWindowFound)?
+            .lock()
+            .map_err(|_| VEDeviceError::WindowLockingFailed)?;
+
         let display_handle = winit_window
             .display_handle()
             .map_err(VEDeviceError::NoWinitDisplayHandle)?

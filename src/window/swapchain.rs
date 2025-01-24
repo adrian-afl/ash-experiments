@@ -25,6 +25,9 @@ pub enum VESwapchainError {
     #[error("blit semaphore locking failed")]
     BlitSemaphoreLockingFailed,
 
+    #[error("window locking failed")]
+    WindowLockingFailed,
+
     #[error("semaphore error")]
     SemaphoreError(#[from] VESemaphoreError),
 
@@ -88,7 +91,9 @@ impl VESwapchain {
         let winit_window = window
             .window
             .as_ref()
-            .ok_or(VESwapchainError::NoWinitWindowFound)?;
+            .ok_or(VESwapchainError::NoWinitWindowFound)?
+            .lock()
+            .map_err(|_| VESwapchainError::WindowLockingFailed)?;
 
         let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
             device.clone(),

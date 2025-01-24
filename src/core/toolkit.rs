@@ -25,8 +25,7 @@ use crate::memory::memory_manager::VEMemoryManager;
 use crate::window::swapchain::{VESwapchain, VESwapchainError};
 use crate::window::window::{AppCallback, VEWindow, VEWindowError};
 use ash::vk;
-use std::sync::{Arc, LockResult, Mutex};
-use std::{fs, io};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
@@ -51,7 +50,7 @@ pub enum VEToolkitError {
 }
 
 pub trait App {
-    fn draw(&mut self, window: &mut Window);
+    fn draw(&mut self);
     fn on_window_event(&self, event: WindowEvent);
     fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent);
 }
@@ -66,39 +65,32 @@ pub struct VEToolkit {
 
 pub struct VEToolkitCallbacks {
     toolkit: Option<Arc<VEToolkit>>,
-    pub window: Option<Arc<VEWindow>>,
-    create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
+    create_app: Box<dyn Fn(Arc<VEToolkit>, Arc<Mutex<Window>>) -> Arc<Mutex<dyn App>>>,
     app: Option<Arc<Mutex<dyn App>>>,
 }
 
 impl AppCallback for VEToolkitCallbacks {
-    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>) {
+    fn on_window_ready(&mut self, toolkit: Arc<VEToolkit>, window: Arc<Mutex<Window>>) {
         self.toolkit = Some(toolkit);
         let constructor = &self.create_app;
         let toolkit = self.toolkit.as_ref();
         match toolkit {
             None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
             Some(toolkit) => {
-                let app = constructor(toolkit.clone());
+                let app = constructor(toolkit.clone(), window.clone());
                 self.app = Some(app);
             }
         }
     }
 
-    fn on_window_draw(&self, window: &mut Window) {
+    fn on_window_draw(&self) {
         let app = self.app.as_ref();
         match app {
             None => println!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
-                    Ok(mut app) => {
-                        let toolkit = self.toolkit.as_ref();
-                        match toolkit {
-                            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
-                            Some(toolkit) => app.draw(window),
-                        }
-                    }
+                    Ok(mut app) => app.draw(),
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
                 }
             }
@@ -134,7 +126,7 @@ impl AppCallback for VEToolkitCallbacks {
             Some(app) => {
                 let app = app.lock();
                 match app {
-                    Ok(mut app) => {
+                    Ok(app) => {
                         app.on_window_event(event);
                     }
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
@@ -150,7 +142,7 @@ impl AppCallback for VEToolkitCallbacks {
             Some(app) => {
                 let app = app.lock();
                 match app {
-                    Ok(mut app) => {
+                    Ok(app) => {
                         app.on_device_event(device_id, event);
                     }
                     Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
@@ -162,29 +154,22 @@ impl AppCallback for VEToolkitCallbacks {
 
 impl VEToolkit {
     pub fn start(
-        create_app: Box<dyn Fn(Arc<VEToolkit>) -> Arc<Mutex<dyn App>>>,
+        create_app: Box<dyn Fn(Arc<VEToolkit>, Arc<Mutex<Window>>) -> Arc<Mutex<dyn App>>>,
         initial_window_attributes: WindowAttributes,
     ) -> Result<(), VEToolkitError> {
         let callbacks = Arc::new(Mutex::from(VEToolkitCallbacks {
             toolkit: None,
-            window: None,
             app: None,
             create_app,
         }));
-        callbacks
-            .lock()
-            .map_err(|_| VEToolkitError::CallbacksLockingFailed)?
-            .window = Some(Arc::new(VEWindow::new(
-            callbacks.clone(),
-            initial_window_attributes,
-        )?));
+        VEWindow::new(callbacks.clone(), initial_window_attributes)?;
         Ok(())
     }
 
     pub fn new(window: &VEWindow) -> Result<VEToolkit, VEToolkitError> {
         let device = Arc::new(VEDevice::new(&window)?);
 
-        let mut memory_manager = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
+        let memory_manager = Arc::new(Mutex::from(VEMemoryManager::new(device.clone())));
 
         let command_pool = Arc::new(VECommandPool::new(device.clone())?);
 

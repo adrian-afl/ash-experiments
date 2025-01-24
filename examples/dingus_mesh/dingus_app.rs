@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vengine_rs::buffer::buffer::{VEBuffer, VEBufferUsage};
 use vengine_rs::core::descriptor_set::VEDescriptorSet;
 use vengine_rs::core::descriptor_set_layout::{
@@ -22,6 +22,7 @@ use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::Window;
 
 pub struct DingusApp {
+    window: Arc<Mutex<Window>>,
     scheduler: VEScheduler,
     elapsed: f32,
 
@@ -54,7 +55,7 @@ struct Mesh {
 
 #[allow(clippy::unwrap_used)]
 impl DingusApp {
-    pub fn new(toolkit: Arc<VEToolkit>) -> DingusApp {
+    pub fn new(toolkit: Arc<VEToolkit>, window: Arc<Mutex<Window>>) -> DingusApp {
         let mesh_stage = Self::create_mesh_stage(&toolkit);
 
         let mut scheduler = toolkit.create_scheduler(2);
@@ -70,6 +71,8 @@ impl DingusApp {
         scheduler.set_layer(1, vec![blit_item]).unwrap();
 
         let mut app = DingusApp {
+            window,
+
             mesh_stage,
             meshes: vec![],
 
@@ -265,7 +268,7 @@ impl DingusApp {
 
 #[allow(clippy::unwrap_used)]
 impl App for DingusApp {
-    fn draw(&mut self, window: &mut Window) {
+    fn draw(&mut self) {
         let pointer = self.mesh_stage.uniform_buffer.map().unwrap() as *mut f32;
         unsafe {
             pointer.write(self.elapsed);
@@ -294,7 +297,10 @@ impl App for DingusApp {
 
         self.elapsed += 0.001;
 
-        window.set_title(format!("{}", self.elapsed).as_str());
+        self.window
+            .lock()
+            .unwrap()
+            .set_title(format!("{}", self.elapsed).as_str());
     }
 
     fn on_window_event(&self, event: WindowEvent) {}

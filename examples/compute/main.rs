@@ -80,7 +80,7 @@ impl ComputeApp {
 }
 
 impl App for ComputeApp {
-    fn draw(&mut self, window: &mut Window) {}
+    fn draw(&mut self) {}
     fn on_window_event(&self, event: WindowEvent) {}
     fn on_device_event(&self, device_id: DeviceId, event: DeviceEvent) {}
 }
@@ -102,7 +102,7 @@ fn main() {
         .with_title("compute");
 
     VEToolkit::start(
-        Box::from(|toolkit: Arc<VEToolkit>| {
+        Box::from(|toolkit: Arc<VEToolkit>, window: Arc<Mutex<Window>>| {
             let app = ComputeApp::calculate(toolkit);
             Arc::new(Mutex::from(app)) as Arc<Mutex<dyn App>>
         }),
