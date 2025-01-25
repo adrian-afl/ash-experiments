@@ -30,7 +30,7 @@ fn get_image_usage_flags(usages: &[VEImageUsage]) -> vk::ImageUsageFlags {
 impl VEImage {
     pub fn from_full(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
 

@@ -47,7 +47,7 @@ impl VEVertexBuffer {
 
     pub fn from_data(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         data: Vec<u8>,
@@ -88,7 +88,7 @@ impl VEVertexBuffer {
 
         unsafe {
             let mem = staging_buffer.map()? as *mut u8;
-            let mut slice = std::slice::from_raw_parts_mut(mem, input_size as usize);
+            let slice = std::slice::from_raw_parts_mut(mem, input_size as usize);
             slice.copy_from_slice(&data);
             staging_buffer.unmap()?;
         }
@@ -104,7 +104,7 @@ impl VEVertexBuffer {
 
     pub fn from_file(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,
@@ -137,7 +137,7 @@ impl VEVertexBuffer {
             Some(VEMemoryProperties::HostCoherent),
         )?;
 
-        let mut final_buffer = VEBuffer::new(
+        let final_buffer = VEBuffer::new(
             device.clone(),
             queue.clone(),
             command_pool.clone(),

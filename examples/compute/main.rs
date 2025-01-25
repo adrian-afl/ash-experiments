@@ -61,10 +61,10 @@ impl ComputeApp {
         compute_stage.end_recording().unwrap();
         compute_stage
             .command_buffer
-            .submit(&toolkit.queue, vec![], vec![])
+            .submit(&toolkit.queue.lock().unwrap(), vec![], vec![])
             .unwrap();
 
-        toolkit.queue.wait_idle().unwrap();
+        toolkit.queue.lock().unwrap().wait_idle().unwrap();
 
         let pointer = buffer.map().unwrap() as *mut f32;
         unsafe {

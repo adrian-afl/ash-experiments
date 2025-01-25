@@ -5,12 +5,12 @@ use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::image::image::VEImageError;
 use ash::vk;
 use ash::vk::CommandBufferUsageFlags;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub fn transition_image_layout(
     device: Arc<VEDevice>,
     command_pool: Arc<VECommandPool>,
-    queue: Arc<VEMainDeviceQueue>,
+    queue: Arc<Mutex<VEMainDeviceQueue>>,
     image_handle: vk::Image,
     aspect: vk::ImageAspectFlags,
     current_layout: vk::ImageLayout,
@@ -102,6 +102,8 @@ pub fn transition_image_layout(
     );
 
     command_buffer.end()?;
+
+    let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
 
     command_buffer.submit(&queue, vec![], vec![])?;
     queue.wait_idle()?;

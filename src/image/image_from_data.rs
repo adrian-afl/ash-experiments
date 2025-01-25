@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 impl VEImage {
     pub fn from_data(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
 
@@ -91,8 +91,12 @@ impl VEImage {
 
         command_buffer.end()?;
 
-        command_buffer.submit(&queue, vec![], vec![])?;
-        queue.wait_idle()?;
+        {
+            let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
+
+            command_buffer.submit(&queue, vec![], vec![])?;
+            queue.wait_idle()?;
+        }
 
         result.transition_layout(
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,

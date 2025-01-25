@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 impl VEImage {
     pub fn from_file(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         path: &str,

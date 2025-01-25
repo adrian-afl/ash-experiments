@@ -58,7 +58,7 @@ pub trait App {
 pub struct VEToolkit {
     pub device: Arc<VEDevice>,
     pub swapchain: Arc<Mutex<VESwapchain>>,
-    pub queue: Arc<VEMainDeviceQueue>, // TODO maybe this could be made private
+    pub queue: Arc<Mutex<VEMainDeviceQueue>>, // TODO maybe this could be made private
     command_pool: Arc<VECommandPool>,
     memory_manager: Arc<Mutex<VEMemoryManager>>,
 }
@@ -173,7 +173,7 @@ impl VEToolkit {
 
         let command_pool = Arc::new(VECommandPool::new(device.clone())?);
 
-        let queue = Arc::new(VEMainDeviceQueue::new(device.clone()));
+        let queue = Arc::new(Mutex::from(VEMainDeviceQueue::new(device.clone())));
 
         let swapchain = Arc::new(Mutex::from(VESwapchain::new(
             &window,

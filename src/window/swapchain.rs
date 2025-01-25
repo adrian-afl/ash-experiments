@@ -1,3 +1,4 @@
+use crate::buffer::buffer::VEBufferError;
 use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
@@ -27,6 +28,9 @@ pub enum VESwapchainError {
 
     #[error("window locking failed")]
     WindowLockingFailed,
+
+    #[error("queue locking failed")]
+    QueueLockingFailed,
 
     #[error("semaphore error")]
     SemaphoreError(#[from] VESemaphoreError),
@@ -61,7 +65,7 @@ pub enum VESwapchainError {
 
 pub struct VESwapchain {
     device: Arc<VEDevice>,
-    main_device_queue: Arc<VEMainDeviceQueue>,
+    queue: Arc<Mutex<VEMainDeviceQueue>>,
     command_pool: Arc<VECommandPool>,
 
     swapchain: SwapchainKHR,
@@ -85,7 +89,7 @@ impl VESwapchain {
     pub fn new(
         window: &VEWindow,
         device: Arc<VEDevice>,
-        main_device_queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
     ) -> Result<VESwapchain, VESwapchainError> {
         let winit_window = window
@@ -97,7 +101,7 @@ impl VESwapchain {
 
         let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
             device.clone(),
-            main_device_queue.clone(),
+            queue.clone(),
             command_pool.clone(),
             winit_window.inner_size(),
         )?;
@@ -111,7 +115,7 @@ impl VESwapchain {
             swapchain,
             swapchain_loader,
             present_images,
-            main_device_queue,
+            queue,
             command_pool,
 
             width: winit_window.inner_size().width,
@@ -125,7 +129,7 @@ impl VESwapchain {
 
     fn create_swapchain_images(
         device: Arc<VEDevice>,
-        main_device_queue: Arc<VEMainDeviceQueue>,
+        main_device_queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         new_size: PhysicalSize<u32>,
     ) -> Result<(SwapchainKHR, swapchain::Device, Vec<VEImage>), VESwapchainError> {
@@ -228,7 +232,7 @@ impl VESwapchain {
 
         let (swapchain, swapchain_loader, present_images) = Self::create_swapchain_images(
             self.device.clone(),
-            self.main_device_queue.clone(),
+            self.queue.clone(),
             self.command_pool.clone(),
             new_size,
         )?;
@@ -328,11 +332,19 @@ impl VESwapchain {
         }
 
         self.present_command_buffer.end()?;
-        self.present_command_buffer.submit(
-            &self.main_device_queue,
-            wait_handles,
-            vec![blit_semaphore.clone()],
-        )?;
+
+        {
+            let queue = &self
+                .queue
+                .lock()
+                .map_err(|_| VESwapchainError::QueueLockingFailed)?;
+
+            self.present_command_buffer.submit(
+                queue,
+                wait_handles,
+                vec![blit_semaphore.clone()],
+            )?;
+        }
 
         self.present_images[acquired as usize]
             .transition_layout(vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR)?;
@@ -353,9 +365,15 @@ impl VESwapchain {
             .wait_semaphores(&wait_handles)
             .swapchains(&swapchains)
             .image_indices(&images);
+
+        let queue = &self
+            .queue
+            .lock()
+            .map_err(|_| VESwapchainError::QueueLockingFailed)?;
+
         unsafe {
             self.swapchain_loader
-                .queue_present(self.main_device_queue.main_queue, &info)
+                .queue_present(queue.main_queue, &info)
                 .map_err(VESwapchainError::PresentFailed)?;
         }
         Ok(())

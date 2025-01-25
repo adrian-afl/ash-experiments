@@ -1,6 +1,6 @@
-use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferUsage};
+use crate::buffer::buffer::{VEBuffer, VEBufferUsage};
 use crate::core::device::VEDevice;
-use crate::image::image::{VEImage, VEImageViewCreateInfo};
+use crate::image::image::VEImage;
 use crate::image::sampler::VESampler;
 use ash::vk;
 use std::sync::Arc;

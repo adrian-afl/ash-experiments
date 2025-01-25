@@ -4,15 +4,14 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::image::transition_image_layout::transition_image_layout;
-use crate::memory::memory_chunk::{VEMemoryChunk, VEMemoryChunkError, VESingleAllocation};
+use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::VEMemoryManagerError;
 use ash::vk;
-use ash::vk::ImageView;
 use image::ImageError;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 #[path = "./image_from_data.rs"]
@@ -58,6 +57,9 @@ pub enum VEImageError {
 
     #[error("no suitable memory type found")]
     NoSuitableMemoryTypeFound,
+
+    #[error("queue locking failed")]
+    QueueLockingFailed,
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +117,7 @@ impl VEImageViewCreateInfo {
 #[derive(Clone)]
 pub struct VEImage {
     device: Arc<VEDevice>,
-    queue: Arc<VEMainDeviceQueue>,
+    queue: Arc<Mutex<VEMainDeviceQueue>>,
     command_pool: Arc<VECommandPool>,
 
     pub width: u32,

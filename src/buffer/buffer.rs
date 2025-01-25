@@ -3,7 +3,6 @@ use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProperties};
-use crate::image::image::VEImageUsage;
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
@@ -33,6 +32,9 @@ pub enum VEBufferError {
 
     #[error("no suitable memory type found")]
     NoSuitableMemoryTypeFound,
+
+    #[error("queue locking failed")]
+    QueueLockingFailed,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,7 +48,7 @@ pub enum VEBufferUsage {
 
 pub struct VEBuffer {
     device: Arc<VEDevice>,
-    queue: Arc<VEMainDeviceQueue>,
+    queue: Arc<Mutex<VEMainDeviceQueue>>,
     command_pool: Arc<VECommandPool>,
     memory_manager: Arc<Mutex<VEMemoryManager>>,
     allocation: VESingleAllocation,
@@ -74,7 +76,7 @@ fn get_buffer_usage_flags(usages: &[VEBufferUsage]) -> vk::BufferUsageFlags {
 impl VEBuffer {
     pub fn new(
         device: Arc<VEDevice>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
         usage: &[VEBufferUsage],
@@ -163,8 +165,13 @@ impl VEBuffer {
 
         command_buffer.end()?;
 
-        command_buffer.submit(&self.queue, vec![], vec![])?;
-        self.queue.wait_idle()?;
+        let queue = &self
+            .queue
+            .lock()
+            .map_err(|_| VEBufferError::QueueLockingFailed)?;
+
+        command_buffer.submit(queue, vec![], vec![])?;
+        queue.wait_idle()?;
 
         Ok(())
     }

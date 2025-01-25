@@ -20,6 +20,9 @@ pub enum VESchedulerError {
     #[error("swapchain locking failed")]
     SwapchainLockingFailed,
 
+    #[error("queue locking failed")]
+    QueueLockingFailed,
+
     #[error("semaphore error")]
     SemaphoreError(#[from] VESemaphoreError),
 
@@ -52,7 +55,7 @@ struct ScheduleLayer {
 pub struct VEScheduler {
     device: Arc<VEDevice>,
     swapchain: Arc<Mutex<VESwapchain>>,
-    queue: Arc<VEMainDeviceQueue>,
+    queue: Arc<Mutex<VEMainDeviceQueue>>,
     layers: Vec<Arc<Mutex<ScheduleLayer>>>,
 }
 
@@ -60,7 +63,7 @@ impl VEScheduler {
     pub fn new(
         device: Arc<VEDevice>,
         swapchain: Arc<Mutex<VESwapchain>>,
-        queue: Arc<VEMainDeviceQueue>,
+        queue: Arc<Mutex<VEMainDeviceQueue>>,
         layers_count: u8,
     ) -> VEScheduler {
         let mut layers = vec![];
@@ -176,14 +179,20 @@ impl VEScheduler {
                     .lock()
                     .map_err(|_| VESchedulerError::ItemLockingFailed)?;
                 // println!("ITEM {}", item.name);
+
                 match &item.stage {
                     Stage::Compute(stage) => {
                         let mut previous_semaphores: Vec<Arc<Mutex<VESemaphore>>> = vec![];
                         for x in 0..layer_semaphores[previous_i].len() {
                             previous_semaphores.push(layer_semaphores[previous_i][x].clone());
                         }
+
+                        let queue = &self
+                            .queue
+                            .lock()
+                            .map_err(|_| VESchedulerError::QueueLockingFailed)?;
                         stage.command_buffer.submit(
-                            &self.queue,
+                            queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
                         )?
@@ -193,8 +202,13 @@ impl VEScheduler {
                         for x in 0..layer_semaphores[previous_i].len() {
                             previous_semaphores.push(layer_semaphores[previous_i][x].clone());
                         }
+
+                        let queue = &self
+                            .queue
+                            .lock()
+                            .map_err(|_| VESchedulerError::QueueLockingFailed)?;
                         stage.command_buffer.submit(
-                            &self.queue,
+                            queue,
                             previous_semaphores,
                             vec![item.semaphore.clone()],
                         )?
