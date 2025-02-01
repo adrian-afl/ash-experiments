@@ -235,7 +235,7 @@ impl VEToolkit {
 
     pub fn create_image_from_data(
         &self,
-        data: Vec<u8>,
+        data: &[u8],
 
         width: u32,
         height: u32,

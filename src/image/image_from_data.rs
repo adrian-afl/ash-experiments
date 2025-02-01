@@ -18,7 +18,7 @@ impl VEImage {
         command_pool: Arc<VECommandPool>,
         memory_manager: Arc<Mutex<VEMemoryManager>>,
 
-        data: Vec<u8>,
+        data: &[u8],
 
         width: u32,
         height: u32,

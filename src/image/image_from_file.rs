@@ -40,7 +40,7 @@ impl VEImage {
             queue,
             command_pool,
             memory_manager,
-            Vec::from(img.as_bytes()),
+            &Vec::from(img.as_bytes()),
             img.width(),
             img.height(),
             1,
