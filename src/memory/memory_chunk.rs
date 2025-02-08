@@ -36,8 +36,11 @@ pub struct VEMemoryChunk {
     pub allocations: Vec<VESingleAllocation>,
     pub handle: DeviceMemory,
     identifier_counter: u64,
-    ptr: Option<Arc<*mut core::ffi::c_void>>,
+    ptr: Option<*mut core::ffi::c_void>,
 }
+
+unsafe impl Send for VEMemoryChunk {}
+unsafe impl Sync for VEMemoryChunk {}
 
 impl Debug for VEMemoryChunk {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -170,12 +173,12 @@ impl VEMemoryChunk {
     pub fn map(&mut self, offset: u64) -> Result<*mut core::ffi::c_void, VEMemoryChunkError> {
         if self.ptr.is_none() {
             // once mapped, stays mapped
-            self.ptr = Some(Arc::new(unsafe {
+            self.ptr = Some(unsafe {
                 self.device
                     .device
                     .map_memory(self.handle, 0, CHUNK_SIZE, MemoryMapFlags::default())
                     .map_err(VEMemoryChunkError::MappingFailed)?
-            }));
+            });
         }
 
         Ok(unsafe {
