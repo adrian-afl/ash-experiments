@@ -273,7 +273,7 @@ impl App for DingusApp {
         unsafe {
             pointer.write(self.elapsed);
         }
-        self.mesh_stage.uniform_buffer.unmap().unwrap();
+        // self.mesh_stage.uniform_buffer.unmap().unwrap();
 
         self.mesh_stage.render_stage.begin_recording().unwrap();
 

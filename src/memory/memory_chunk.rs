@@ -18,6 +18,8 @@ pub enum VEMemoryChunkError {
     BindingImageMemoryFailed(#[source] vk::Result),
     #[error("mapping failed")]
     MappingFailed(#[source] vk::Result),
+    #[error("pointer not found")]
+    PointerNotFound,
 }
 
 #[derive(Clone, Debug)]
@@ -34,6 +36,7 @@ pub struct VEMemoryChunk {
     pub allocations: Vec<VESingleAllocation>,
     pub handle: DeviceMemory,
     identifier_counter: u64,
+    ptr: Option<*mut core::ffi::c_void>,
 }
 
 impl Debug for VEMemoryChunk {
@@ -59,12 +62,14 @@ impl VEMemoryChunk {
                 )
                 .map_err(VEMemoryChunkError::AllocationFailed)?
         };
+
         Ok(VEMemoryChunk {
             device,
             chunk_identifier,
             allocations: vec![],
             handle,
             identifier_counter: 0,
+            ptr: None,
         })
     }
 
@@ -162,20 +167,29 @@ impl VEMemoryChunk {
         }
     }
 
-    pub fn map(
-        &self,
-        offset: u64,
-        size: u64,
-    ) -> Result<*mut core::ffi::c_void, VEMemoryChunkError> {
-        unsafe {
-            self.device
-                .device
-                .map_memory(self.handle, offset, size, MemoryMapFlags::default())
-                .map_err(VEMemoryChunkError::MappingFailed)
+    pub fn map(&mut self, offset: u64) -> Result<*mut core::ffi::c_void, VEMemoryChunkError> {
+        if self.ptr.is_none() {
+            // once mapped, stays mapped
+            self.ptr = Some(unsafe {
+                self.device
+                    .device
+                    .map_memory(self.handle, 0, CHUNK_SIZE, MemoryMapFlags::default())
+                    .map_err(VEMemoryChunkError::MappingFailed)?
+            });
         }
+
+        Ok(unsafe {
+            let ptr = self
+                .ptr
+                .as_mut()
+                .ok_or(VEMemoryChunkError::PointerNotFound)?;
+
+            ptr.offset(offset as isize)
+        })
     }
 
-    pub fn unmap(&self) {
+    pub fn unmap(&mut self) {
+        self.ptr = None;
         unsafe {
             self.device.device.unmap_memory(self.handle);
         }

@@ -18,9 +18,6 @@ pub enum VEMemoryManagerError {
     #[error("no allocation found to free")]
     NoAllocationFoundToFree,
 
-    #[error("memory already mapped")]
-    MemoryAlreadyMapped,
-
     #[error("mapping failed")]
     MappingFailed(#[from] VEMemoryChunkError),
 }
@@ -29,7 +26,6 @@ pub struct VEMemoryManager {
     device: Arc<VEDevice>,
     chunks: HashMap<u32, Vec<VEMemoryChunk>>,
     identifier_counter: u64,
-    mapped: bool,
 }
 
 impl Debug for VEMemoryManager {
@@ -44,7 +40,6 @@ impl VEMemoryManager {
             device,
             chunks: HashMap::new(),
             identifier_counter: 0,
-            mapped: false,
         }
     }
 
@@ -117,16 +112,11 @@ impl VEMemoryManager {
         &mut self,
         allocation: &VESingleAllocation,
     ) -> Result<*mut core::ffi::c_void, VEMemoryManagerError> {
-        if self.mapped {
-            // this is to work around the limitation of memory chunks
-            return Err(VEMemoryManagerError::MemoryAlreadyMapped);
-        }
-        for chunks_for_type in self.chunks.values() {
-            for chunk in chunks_for_type {
+        for chunks_for_type in self.chunks.values_mut() {
+            for mut chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
-                    self.mapped = true;
                     return chunk
-                        .map(allocation.offset, allocation.size)
+                        .map(allocation.offset)
                         .map_err(VEMemoryManagerError::MappingFailed);
                 }
             }
@@ -135,10 +125,9 @@ impl VEMemoryManager {
     }
 
     pub fn unmap(&mut self, allocation: &VESingleAllocation) -> Result<(), VEMemoryManagerError> {
-        for chunks_for_type in self.chunks.values() {
-            for chunk in chunks_for_type {
+        for chunks_for_type in self.chunks.values_mut() {
+            for mut chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
-                    self.mapped = false;
                     chunk.unmap();
                     return Ok(());
                 }

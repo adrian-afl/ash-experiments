@@ -34,7 +34,7 @@ impl ComputeApp {
             pointer.offset(2).write(100.0);
             pointer.offset(3).write(1000.0);
         }
-        buffer.unmap().unwrap();
+        // buffer.unmap().unwrap();
 
         let mut set_layout = toolkit
             .create_descriptor_set_layout(&[VEDescriptorSetLayoutField {
@@ -73,7 +73,7 @@ impl ComputeApp {
             println!("{}", pointer.offset(2).read());
             println!("{}", pointer.offset(3).read());
         }
-        buffer.unmap().unwrap();
+        // buffer.unmap().unwrap();
 
         process::exit(0);
     }

@@ -90,7 +90,7 @@ impl VEVertexBuffer {
             let mem = staging_buffer.map()? as *mut u8;
             let slice = std::slice::from_raw_parts_mut(mem, input_size as usize);
             slice.copy_from_slice(&data);
-            staging_buffer.unmap()?;
+            // staging_buffer.unmap()?;
         }
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
@@ -152,7 +152,7 @@ impl VEVertexBuffer {
             let mut slice = std::slice::from_raw_parts_mut(mem, file_size as usize);
             file.read_exact(&mut slice)
                 .map_err(VEVertexBufferError::ReadingFileFailed)?;
-            staging_buffer.unmap()?;
+            // staging_buffer.unmap()?;
         }
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;

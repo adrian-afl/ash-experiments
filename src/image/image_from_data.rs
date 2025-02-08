@@ -55,7 +55,7 @@ impl VEImage {
         unsafe {
             let mem = staging_buffer.map()? as *mut u8;
             std::ptr::copy(data.as_ptr(), mem, data.len());
-            staging_buffer.unmap()?;
+            // staging_buffer.unmap()?;
         }
 
         result.transition_layout(result.current_layout, vk::ImageLayout::TRANSFER_DST_OPTIMAL)?;
