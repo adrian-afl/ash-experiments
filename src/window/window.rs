@@ -1,5 +1,5 @@
 use crate::core::toolkit::VEToolkit;
-use ash::Entry;
+use ash::{Entry, LoadingError};
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -17,6 +17,9 @@ pub enum VEWindowError {
 
     #[error("event loop cannot start")]
     EventLoopCannotStart(#[source] EventLoopError),
+
+    #[error("vulkan loading error")]
+    LoadingError(#[source] LoadingError),
 }
 
 pub trait AppCallback {
@@ -160,7 +163,7 @@ impl VEWindow {
 
         let mut window = VEWindow {
             window: None,
-            entry: Entry::linked(),
+            entry: unsafe { Entry::load().map_err(VEWindowError::LoadingError)? },
             initial_window_attributes,
             app,
         };
