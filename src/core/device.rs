@@ -11,9 +11,7 @@ use ash::{vk, Device, Instance};
 use std::borrow::Cow;
 use std::ffi;
 use std::fmt::{Debug, Formatter};
-use std::os::raw::c_char;
 use thiserror::Error;
-use tracing::{event, Level};
 use winit::raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
 
 #[derive(Error, Debug)]
@@ -92,7 +90,7 @@ unsafe extern "system" fn vulkan_debug_callback(
         ffi::CStr::from_ptr(callback_data.p_message).to_string_lossy()
     };
 
-    event!(Level::WARN,
+    eprintln!(
         "VALIDATION {message_severity:?}: {message_type:?} [{message_id_name} ({message_id_number})] : {message}",
     );
 

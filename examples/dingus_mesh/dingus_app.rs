@@ -113,7 +113,7 @@ impl DingusApp {
             }])
             .unwrap();
 
-        let mut mesh_descriptor_set_layout = toolkit
+        let mesh_descriptor_set_layout = toolkit
             .create_descriptor_set_layout(&[VEDescriptorSetLayoutField {
                 binding: 0,
                 typ: VEDescriptorSetFieldType::Sampler,
@@ -224,7 +224,7 @@ impl DingusApp {
         }
     }
 
-    pub fn create_mesh(&mut self, toolkit: &VEToolkit, texture: &str, model: &str) -> Mesh {
+    fn create_mesh(&mut self, toolkit: &VEToolkit, texture: &str, model: &str) -> Mesh {
         let descriptor_set = self
             .mesh_stage
             .mesh_descriptor_set_layout
@@ -303,7 +303,7 @@ impl App for DingusApp {
             .set_title(format!("{}", self.elapsed).as_str());
     }
 
-    fn on_window_event(&mut self, event: WindowEvent) {}
+    fn on_window_event(&mut self, _: WindowEvent) {}
 
-    fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {}
+    fn on_device_event(&mut self, _: DeviceId, _: DeviceEvent) {}
 }

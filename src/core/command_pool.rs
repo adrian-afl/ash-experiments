@@ -5,7 +5,6 @@ use thiserror::Error;
 
 #[derive(Debug)]
 pub struct VECommandPool {
-    device: Arc<VEDevice>,
     pub handle: vk::CommandPool,
 }
 
@@ -22,9 +21,6 @@ impl VECommandPool {
             .queue_family_index(device.queue_family_index);
         let pool = unsafe { device.device.create_command_pool(&pool_info, None)? };
 
-        Ok(VECommandPool {
-            device,
-            handle: pool,
-        })
+        Ok(VECommandPool { handle: pool })
     }
 }

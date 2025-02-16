@@ -4,7 +4,6 @@ use ash::vk::{Buffer, DeviceMemory, DeviceSize, Image, MemoryAllocateInfo, Memor
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{event, Level};
 
 static CHUNK_SIZE: u64 = 256 * 1024 * 1024;
 
@@ -79,11 +78,6 @@ impl VEMemoryChunk {
     pub fn free_allocation(&mut self, alloc_identifier: u64) {
         for i in 0..self.allocations.len() {
             if self.allocations[i].alloc_identifier == alloc_identifier {
-                event!(
-                    Level::TRACE,
-                    "FREEING offset {}!",
-                    self.allocations[i].offset
-                );
                 self.allocations.remove(i);
                 return;
             }
@@ -142,12 +136,10 @@ impl VEMemoryChunk {
 
     pub fn find_free_memory_offset(&self, size: u64) -> Option<u64> {
         if self.is_free_space(0, size) {
-            event!(Level::TRACE, "Zero is free! Amazing");
             return Some(0);
         }
         for a in &self.allocations {
             if self.is_free_space(a.offset + a.size + 0x1000, size) {
-                event!(Level::TRACE, "offset {} is free!", a.offset);
                 return Some(a.offset + a.size + 0x1000);
             }
         }

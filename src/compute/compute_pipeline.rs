@@ -15,7 +15,6 @@ pub enum VEComputePipelineError {
 }
 
 pub struct VEComputePipeline {
-    device: Arc<VEDevice>,
     pub layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
 }
@@ -52,7 +51,6 @@ impl VEComputePipeline {
         };
 
         Ok(VEComputePipeline {
-            device,
             pipeline,
             layout: pipeline_layout,
         })

@@ -57,7 +57,7 @@ impl ApplicationHandler for VEWindow {
 
                 let window = self.window.as_ref();
                 match window {
-                    None => println!(
+                    None => eprintln!(
                         "Completely unexpected problem that window is None right after assignment"
                     ),
                     Some(window) => {
@@ -65,22 +65,22 @@ impl ApplicationHandler for VEWindow {
                         match window {
                             Ok(window) => window.request_redraw(),
                             Err(error) => {
-                                println!("Could not lock window mutex! Reason: {:?}", error)
+                                eprintln!("Could not lock window mutex! Reason: {:?}", error)
                             }
                         }
                     }
                 }
             }
-            Err(error) => println!("Window cannot be created! Reason: {:?}", error),
+            Err(error) => eprintln!("Window cannot be created! Reason: {:?}", error),
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match &self.window {
-            None => println!("Completely unexpected problem that window is None"),
+            None => eprintln!("Completely unexpected problem that window is None"),
             Some(window) => match event {
                 WindowEvent::CloseRequested => {
-                    println!("The close button was pressed; stopping");
+                    eprintln!("The close button was pressed; stopping");
                     event_loop.exit();
                 }
                 WindowEvent::RedrawRequested => {
@@ -88,7 +88,7 @@ impl ApplicationHandler for VEWindow {
                         let window = window.lock();
                         match window {
                             Err(error) => {
-                                println!("Could not lock window mutex! Reason: {:?}", error)
+                                eprintln!("Could not lock window mutex! Reason: {:?}", error)
                             }
                             Ok(window) => window.pre_present_notify(),
                         }
@@ -101,14 +101,17 @@ impl ApplicationHandler for VEWindow {
                                 let window = window.lock();
                                 match window {
                                     Err(error) => {
-                                        println!("Could not lock window mutex! Reason: {:?}", error)
+                                        eprintln!(
+                                            "Could not lock window mutex! Reason: {:?}",
+                                            error
+                                        )
                                     }
                                     Ok(window) => window.request_redraw(),
                                 }
                             }
                         }
                         Err(error) => {
-                            println!("Could not lock app mutex! Reason: {:?}", error)
+                            eprintln!("Could not lock app mutex! Reason: {:?}", error)
                         }
                     };
                 }
@@ -119,7 +122,7 @@ impl ApplicationHandler for VEWindow {
                             app.on_window_resize(new_size);
                         }
                         Err(error) => {
-                            println!("Could not lock app mutex! Reason: {:?}", error)
+                            eprintln!("Could not lock app mutex! Reason: {:?}", error)
                         }
                     };
                 }
@@ -130,7 +133,7 @@ impl ApplicationHandler for VEWindow {
                             app.on_window_event(event);
                         }
                         Err(error) => {
-                            println!("Could not lock app mutex! Reason: {:?}", error)
+                            eprintln!("Could not lock app mutex! Reason: {:?}", error)
                         }
                     };
                 }
@@ -138,18 +141,13 @@ impl ApplicationHandler for VEWindow {
         }
     }
 
-    fn device_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: DeviceId,
-        event: DeviceEvent,
-    ) {
+    fn device_event(&mut self, _: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
         let locked_app = self.app.lock();
         match locked_app {
             Ok(mut app) => {
                 app.on_device_event(device_id, event);
             }
-            Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+            Err(error) => eprintln!("Could not lock app mutex! Reason: {:?}", error),
         };
     }
 }
@@ -183,16 +181,16 @@ impl VEWindow {
                 let toolkit = Arc::new(toolkit);
                 let locked_app = self.app.lock();
                 match &self.window {
-                    None => println!("Completely unexpected problem that window is None"),
+                    None => eprintln!("Completely unexpected problem that window is None"),
                     Some(window) => match locked_app {
                         Ok(mut app) => {
                             app.on_window_ready(toolkit, window.clone());
                         }
-                        Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                        Err(error) => eprintln!("Could not lock app mutex! Reason: {:?}", error),
                     },
                 }
             }
-            Err(error) => println!("Toolkit cannot be created! Reason: {:?}", error),
+            Err(error) => eprintln!("Toolkit cannot be created! Reason: {:?}", error),
         }
     }
 }

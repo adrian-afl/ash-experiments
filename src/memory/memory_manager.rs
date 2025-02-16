@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{event, Level};
 
 #[derive(Error, Debug)]
 pub enum VEMemoryManagerError {
@@ -51,12 +50,6 @@ impl VEMemoryManager {
     ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         let size = size + (0x1000 - (size % 0x1000));
         let free = self.find_free(memory_type_index, size)?;
-        event!(
-            Level::TRACE,
-            "Binding buffer to offset {} size {}",
-            free.1,
-            size
-        );
         free.0.bind_buffer_memory(buffer, size, free.1)
     }
 
@@ -68,12 +61,6 @@ impl VEMemoryManager {
     ) -> Result<VESingleAllocation, VEMemoryChunkError> {
         let size = size + (0x1000 - (size % 0x1000));
         let free = self.find_free(memory_type_index, size)?;
-        event!(
-            Level::TRACE,
-            "Binding image to offset {} size {}",
-            free.1,
-            size
-        );
         free.0.bind_image_memory(image, size, free.1)
     }
 
@@ -86,14 +73,9 @@ impl VEMemoryManager {
 
         for i in 0..chunks_for_type.len() {
             if let Some(offset) = chunks_for_type[i].find_free_memory_offset(size) {
-                event!(Level::TRACE, "Free memory found! type {memory_type_index}");
                 return Ok((&mut chunks_for_type[i], offset));
             }
         }
-        event!(
-            Level::TRACE,
-            "Free memory NOT found! type {memory_type_index}"
-        );
 
         // no suitable chunk found, allocate
         self.identifier_counter += 1;
@@ -113,7 +95,7 @@ impl VEMemoryManager {
         allocation: &VESingleAllocation,
     ) -> Result<*mut core::ffi::c_void, VEMemoryManagerError> {
         for chunks_for_type in self.chunks.values_mut() {
-            for mut chunk in chunks_for_type {
+            for chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
                     return chunk
                         .map(allocation.offset)
@@ -126,7 +108,7 @@ impl VEMemoryManager {
 
     pub fn unmap(&mut self, allocation: &VESingleAllocation) -> Result<(), VEMemoryManagerError> {
         for chunks_for_type in self.chunks.values_mut() {
-            for mut chunk in chunks_for_type {
+            for chunk in chunks_for_type {
                 if chunk.chunk_identifier == allocation.chunk_identifier {
                     chunk.unmap();
                     return Ok(());

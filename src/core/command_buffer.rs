@@ -9,7 +9,6 @@ use ash::vk::{
 };
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tracing::{event, Level};
 
 #[derive(Error, Debug)]
 pub enum VECommandBufferError {
@@ -109,7 +108,6 @@ impl VECommandBuffer {
                         | PipelineStageFlags::COMPUTE_SHADER,
                 );
                 if x.state == SemaphoreState::Pending {
-                    event!(Level::TRACE, "Setting semaphore to Awaited");
                     x.state = SemaphoreState::Awaited;
                 }
             }
@@ -122,7 +120,6 @@ impl VECommandBuffer {
                 .lock()
                 .map_err(|_| VECommandBufferError::SemaphoreLockingFailed)?;
             signal_handles.push(x.handle);
-            event!(Level::TRACE, "Setting semaphore to Pending");
             x.state = SemaphoreState::Pending;
         }
 

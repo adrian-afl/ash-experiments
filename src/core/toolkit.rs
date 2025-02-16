@@ -75,7 +75,7 @@ impl AppCallback for VEToolkitCallbacks {
         let constructor = &self.create_app;
         let toolkit = self.toolkit.as_ref();
         match toolkit {
-            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
+            None => eprintln!("Cannot get self.toolkit in Toolkit AppCallback!"),
             Some(toolkit) => {
                 let app = constructor(toolkit.clone(), window.clone());
                 self.app = Some(app);
@@ -86,12 +86,12 @@ impl AppCallback for VEToolkitCallbacks {
     fn on_window_draw(&self) {
         let app = self.app.as_ref();
         match app {
-            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            None => eprintln!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
                     Ok(mut app) => app.draw(),
-                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    Err(error) => eprintln!("Could not lock app mutex! Reason: {:?}", error),
                 }
             }
         }
@@ -100,7 +100,7 @@ impl AppCallback for VEToolkitCallbacks {
     fn on_window_resize(&mut self, new_size: PhysicalSize<u32>) {
         let toolkit = self.toolkit.as_ref();
         match toolkit {
-            None => println!("Cannot get self.toolkit in Toolkit AppCallback!"),
+            None => eprintln!("Cannot get self.toolkit in Toolkit AppCallback!"),
             Some(toolkit) => match toolkit.device.wait_idle() {
                 Ok(_) => {
                     let swapchain = toolkit.swapchain.lock();
@@ -108,13 +108,13 @@ impl AppCallback for VEToolkitCallbacks {
                         Ok(mut swapchain) => match swapchain.recreate(new_size) {
                             Ok(_) => (),
                             Err(error) => {
-                                println!("Cannot recreate Swapchain! Reason: {:?}", error)
+                                eprintln!("Cannot recreate Swapchain! Reason: {:?}", error)
                             }
                         },
-                        Err(error) => println!("Cannot lock Swapchain! Reason: {:?}", error),
+                        Err(error) => eprintln!("Cannot lock Swapchain! Reason: {:?}", error),
                     }
                 }
-                Err(error) => println!("Cannot wait idle on Device! Reason: {:?}", error),
+                Err(error) => eprintln!("Cannot wait idle on Device! Reason: {:?}", error),
             },
         }
     }
@@ -122,14 +122,14 @@ impl AppCallback for VEToolkitCallbacks {
     fn on_window_event(&mut self, event: WindowEvent) {
         let app = self.app.as_ref();
         match app {
-            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            None => eprintln!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
                     Ok(mut app) => {
                         app.on_window_event(event);
                     }
-                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    Err(error) => eprintln!("Could not lock app mutex! Reason: {:?}", error),
                 }
             }
         }
@@ -138,14 +138,14 @@ impl AppCallback for VEToolkitCallbacks {
     fn on_device_event(&mut self, device_id: DeviceId, event: DeviceEvent) {
         let app = self.app.as_ref();
         match app {
-            None => println!("Cannot get self.app in Toolkit AppCallback!"),
+            None => eprintln!("Cannot get self.app in Toolkit AppCallback!"),
             Some(app) => {
                 let app = app.lock();
                 match app {
                     Ok(mut app) => {
                         app.on_device_event(device_id, event);
                     }
-                    Err(error) => println!("Could not lock app mutex! Reason: {:?}", error),
+                    Err(error) => eprintln!("Could not lock app mutex! Reason: {:?}", error),
                 }
             }
         }
@@ -314,7 +314,7 @@ impl VEToolkit {
     }
 
     pub fn create_vertex_buffer(&self, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
-        VEVertexBuffer::new(self.device.clone(), buffer, vertex_count)
+        VEVertexBuffer::new(buffer, vertex_count)
     }
 
     pub fn create_vertex_buffer_from_file(

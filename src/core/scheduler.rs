@@ -33,11 +33,11 @@ pub enum VESchedulerError {
     CommandBufferError(#[from] VECommandBufferError),
 }
 
-struct BlitStage {
+pub struct BlitStage {
     pub source: Arc<VEImage>,
 }
 
-enum Stage {
+pub enum Stage {
     Compute(Arc<VEComputeStage>),
     Render(Arc<VERenderStage>),
     Blit(BlitStage),
@@ -163,7 +163,6 @@ impl VEScheduler {
         }
 
         for i in 0..non_empty_layers.len() {
-            // println!("LAYER {i}");
             let layer = self.layers[i]
                 .lock()
                 .map_err(|_| VESchedulerError::LayerLockingFailed)?;
@@ -178,7 +177,6 @@ impl VEScheduler {
                 let item = items[h]
                     .lock()
                     .map_err(|_| VESchedulerError::ItemLockingFailed)?;
-                // println!("ITEM {}", item.name);
 
                 match &item.stage {
                     Stage::Compute(stage) => {

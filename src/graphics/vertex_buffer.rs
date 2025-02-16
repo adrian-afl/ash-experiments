@@ -31,15 +31,13 @@ pub enum VEVertexBufferError {
 }
 
 pub struct VEVertexBuffer {
-    device: Arc<VEDevice>,
     pub buffer: VEBuffer,
     pub vertex_count: u32,
 }
 
 impl VEVertexBuffer {
-    pub fn new(device: Arc<VEDevice>, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
+    pub fn new(buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
         VEVertexBuffer {
-            device,
             buffer,
             vertex_count,
         }
@@ -95,11 +93,7 @@ impl VEVertexBuffer {
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
 
-        Ok(VEVertexBuffer::new(
-            device.clone(),
-            final_buffer,
-            vertex_count,
-        ))
+        Ok(VEVertexBuffer::new(final_buffer, vertex_count))
     }
 
     pub fn from_file(
@@ -157,10 +151,6 @@ impl VEVertexBuffer {
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
 
-        Ok(VEVertexBuffer::new(
-            device.clone(),
-            final_buffer,
-            vertex_count,
-        ))
+        Ok(VEVertexBuffer::new(final_buffer, vertex_count))
     }
 }

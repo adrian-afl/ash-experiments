@@ -1,4 +1,3 @@
-use crate::buffer::buffer::VEBufferError;
 use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
@@ -12,7 +11,6 @@ use ash::vk::{CommandBufferUsageFlags, PresentInfoKHR, SwapchainKHR};
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tracing::{event, Level};
 use winit::dpi::PhysicalSize;
 
 #[derive(Error, Debug)]
@@ -265,10 +263,6 @@ impl VESwapchain {
             .lock()
             .map_err(|_| VESwapchainError::AcquireSemaphoreLockingFailed)?
             .state = SemaphoreState::Pending;
-        event!(
-            Level::TRACE,
-            "Setting semaphore acquire_ready_semaphore to Pending"
-        );
         let ack_semaphore = self.acquire_ready_semaphore.clone();
         let acquired = self.acquire_next_image(
             ack_semaphore

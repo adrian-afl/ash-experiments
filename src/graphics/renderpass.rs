@@ -11,7 +11,6 @@ pub enum VERenderPassError {
 }
 
 pub struct VERenderPass {
-    device: Arc<VEDevice>,
     pub handle: vk::RenderPass,
 }
 
@@ -46,7 +45,7 @@ impl VERenderPass {
 
         let handle = unsafe { device.device.create_render_pass(&create_info, None)? };
 
-        Ok(VERenderPass { device, handle })
+        Ok(VERenderPass { handle })
     }
 
     fn create_subpass<'a>(

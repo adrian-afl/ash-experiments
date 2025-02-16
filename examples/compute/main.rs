@@ -1,9 +1,5 @@
-use std::fs::File;
 use std::process;
 use std::sync::{Arc, Mutex};
-use tracing::Level;
-use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::FmtSubscriber;
 use vengine_rs::buffer::buffer::VEBufferUsage;
 use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayoutField,
@@ -87,15 +83,6 @@ impl App for ComputeApp {
 
 #[allow(clippy::unwrap_used)]
 fn main() {
-    let subscriber = FmtSubscriber::builder()
-        .with_ansi(false)
-        .with_writer(File::create("../log.txt").unwrap())
-        .with_span_events(FmtSpan::FULL)
-        .with_max_level(Level::TRACE)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-
     let window_attributes = WindowAttributes::default()
         .with_inner_size(PhysicalSize::new(1, 1))
         .with_visible(false)

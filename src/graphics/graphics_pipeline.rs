@@ -24,7 +24,6 @@ pub enum VEGraphicsPipelineError {
 }
 
 pub struct VEGraphicsPipeline {
-    device: Arc<VEDevice>,
     pub layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
 }
@@ -208,7 +207,6 @@ impl VEGraphicsPipeline {
         };
 
         Ok(VEGraphicsPipeline {
-            device,
             pipeline,
             layout: pipeline_layout,
         })

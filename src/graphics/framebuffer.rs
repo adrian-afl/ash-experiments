@@ -12,7 +12,6 @@ pub enum VEFrameBufferError {
 }
 
 pub struct VEFrameBuffer {
-    device: Arc<VEDevice>,
     pub handle: vk::Framebuffer,
 }
 
@@ -35,6 +34,6 @@ impl VEFrameBuffer {
 
         let handle = unsafe { device.device.create_framebuffer(&create_info, None)? };
 
-        Ok(VEFrameBuffer { device, handle })
+        Ok(VEFrameBuffer { handle })
     }
 }
