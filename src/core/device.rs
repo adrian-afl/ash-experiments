@@ -103,11 +103,11 @@ impl VEDevice {
     pub fn new(window: &VEWindow) -> Result<VEDevice, VEDeviceError> {
         let app_name = c"vengine-rs";
 
-        let layer_names = [c"VK_LAYER_KHRONOS_validation"];
-        let layers_names_raw: Vec<*const c_char> = layer_names
-            .iter()
-            .map(|raw_name| raw_name.as_ptr())
-            .collect();
+        // let layer_names = [c"VK_LAYER_KHRONOS_validation"];
+        // let layers_names_raw: Vec<*const c_char> = layer_names
+        //     .iter()
+        //     .map(|raw_name| raw_name.as_ptr())
+        //     .collect();
 
         let winit_window = window
             .window
@@ -151,7 +151,7 @@ impl VEDevice {
 
         let create_info = InstanceCreateInfo::default()
             .application_info(&appinfo)
-            .enabled_layer_names(&layers_names_raw)
+            // .enabled_layer_names(&layers_names_raw)
             .enabled_extension_names(&extension_names)
             .flags(create_flags);
 
