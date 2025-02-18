@@ -1,3 +1,4 @@
+use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
@@ -91,9 +92,8 @@ impl VEImage {
         };
 
         let mut image = VEImage {
-            device,
-            queue,
-            command_pool,
+            device: device.clone(),
+            queue: queue.clone(),
 
             allocation: Some(allocation),
 
@@ -109,7 +109,19 @@ impl VEImage {
             views: HashMap::new(),
             current_layout: vk::ImageLayout::PREINITIALIZED,
         };
-        image.transition_layout(image.current_layout, vk::ImageLayout::GENERAL)?;
+        let command_buffer = VECommandBuffer::new(device, command_pool)?;
+        command_buffer.begin()?;
+        image.transition_layout(
+            &command_buffer,
+            image.current_layout,
+            vk::ImageLayout::GENERAL,
+        )?;
+        command_buffer.end()?;
+
+        let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
+
+        command_buffer.submit(&queue, vec![], vec![])?;
+        queue.wait_idle()?;
 
         Ok(image)
     }

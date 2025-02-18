@@ -1,4 +1,5 @@
 use crate::buffer::buffer::{VEBuffer, VEBufferError, VEBufferUsage};
+use crate::core::command_buffer::VECommandBuffer;
 use crate::core::command_pool::VECommandPool;
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::VEMainDeviceQueue;
@@ -31,13 +32,15 @@ pub enum VEVertexBufferError {
 }
 
 pub struct VEVertexBuffer {
+    device: Arc<VEDevice>,
     pub buffer: VEBuffer,
     pub vertex_count: u32,
 }
 
 impl VEVertexBuffer {
-    pub fn new(buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
+    pub fn new(device: Arc<VEDevice>, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
         VEVertexBuffer {
+            device,
             buffer,
             vertex_count,
         }
@@ -93,7 +96,7 @@ impl VEVertexBuffer {
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
 
-        Ok(VEVertexBuffer::new(final_buffer, vertex_count))
+        Ok(VEVertexBuffer::new(device, final_buffer, vertex_count))
     }
 
     pub fn from_file(
@@ -151,6 +154,20 @@ impl VEVertexBuffer {
 
         staging_buffer.copy_to(&final_buffer, 0, 0, staging_buffer.size)?;
 
-        Ok(VEVertexBuffer::new(final_buffer, vertex_count))
+        Ok(VEVertexBuffer::new(device, final_buffer, vertex_count))
+    }
+
+    pub fn draw_instanced(&self, command_buffer: &VECommandBuffer, instances: u32) {
+        unsafe {
+            self.device.device.cmd_bind_vertex_buffers(
+                command_buffer.handle,
+                0,
+                &[self.buffer.buffer],
+                &[0],
+            );
+            self.device
+                .device
+                .cmd_draw(command_buffer.handle, self.vertex_count, instances, 0, 0);
+        }
     }
 }

@@ -1,6 +1,5 @@
 use crate::buffer::buffer::VEBufferError;
-use crate::core::command_buffer::VECommandBufferError;
-use crate::core::command_pool::VECommandPool;
+use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
 use crate::core::device::VEDevice;
 use crate::core::main_device_queue::{VEMainDeviceQueue, VEMainDeviceQueueError};
 use crate::image::transition_image_layout::transition_image_layout;
@@ -118,7 +117,6 @@ impl VEImageViewCreateInfo {
 pub struct VEImage {
     device: Arc<VEDevice>,
     queue: Arc<Mutex<VEMainDeviceQueue>>,
-    command_pool: Arc<VECommandPool>,
 
     pub width: u32,
     pub height: u32,
@@ -148,13 +146,13 @@ impl VEImage {
 
     pub fn transition_layout(
         &mut self,
+        command_buffer: &VECommandBuffer,
         from_layout: vk::ImageLayout,
         to_layout: vk::ImageLayout,
     ) -> Result<(), VEImageError> {
         transition_image_layout(
             self.device.clone(),
-            self.command_pool.clone(),
-            self.queue.clone(),
+            command_buffer,
             self.handle,
             self.aspect,
             from_layout,

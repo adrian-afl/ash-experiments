@@ -1,13 +1,16 @@
+use ash::vk::{AccessFlags, ImageAspectFlags, ImageLayout, PipelineStageFlags};
 use std::sync::{Arc, Mutex};
 use vengine_rs::buffer::buffer::{VEBuffer, VEBufferUsage};
+use vengine_rs::core::command_buffer::VECommandBuffer;
 use vengine_rs::core::descriptor_set::VEDescriptorSet;
 use vengine_rs::core::descriptor_set_layout::{
     VEDescriptorSetFieldStage, VEDescriptorSetFieldType, VEDescriptorSetLayout,
     VEDescriptorSetLayoutField,
 };
 use vengine_rs::core::helpers::{clear_color_f32, clear_depth};
+use vengine_rs::core::memory_barrier::{submit_barriers, VEImageMemoryBarrier};
 use vengine_rs::core::memory_properties::VEMemoryProperties;
-use vengine_rs::core::scheduler::VEScheduler;
+use vengine_rs::core::semaphore::VESemaphore;
 use vengine_rs::core::shader_module::VEShaderModuleType;
 use vengine_rs::core::toolkit::{App, VEToolkit};
 use vengine_rs::graphics::attachment::VEAttachment;
@@ -15,18 +18,20 @@ use vengine_rs::graphics::render_stage::{VECullMode, VEPrimitiveTopology, VERend
 use vengine_rs::graphics::vertex_attributes::VertexAttribFormat;
 use vengine_rs::graphics::vertex_buffer::VEVertexBuffer;
 use vengine_rs::image::filtering::VEFiltering;
-use vengine_rs::image::image::{VEImage, VEImageUsage, VEImageViewCreateInfo};
+use vengine_rs::image::image::{VEImage, VEImageError, VEImageUsage, VEImageViewCreateInfo};
 use vengine_rs::image::image_format::VEImageFormat;
 use vengine_rs::image::sampler::{VESampler, VESamplerAddressMode};
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::window::Window;
 
 pub struct DingusApp {
+    toolkit: Arc<VEToolkit>,
     window: Arc<Mutex<Window>>,
-    scheduler: VEScheduler,
     elapsed: f32,
 
     mesh_stage: MeshStage,
+    command_buffer: VECommandBuffer,
+    frame_done_semaphore: Arc<Mutex<VESemaphore>>,
 
     meshes: Vec<Mesh>,
 }
@@ -58,25 +63,15 @@ impl DingusApp {
     pub fn new(toolkit: Arc<VEToolkit>, window: Arc<Mutex<Window>>) -> DingusApp {
         let mesh_stage = Self::create_mesh_stage(&toolkit);
 
-        let mut scheduler = toolkit.create_scheduler(2);
-
-        let render_item = scheduler
-            .create_render_item(mesh_stage.render_stage.clone())
-            .unwrap();
-        let blit_item = scheduler
-            .create_blit_item(mesh_stage.color_buffer.clone())
-            .unwrap();
-
-        scheduler.set_layer(0, vec![render_item]).unwrap();
-        scheduler.set_layer(1, vec![blit_item]).unwrap();
-
         let mut app = DingusApp {
             window,
+            toolkit: toolkit.clone(),
+            command_buffer: toolkit.create_command_buffer().unwrap(),
+            frame_done_semaphore: Arc::new(Mutex::new(toolkit.create_semaphore().unwrap())),
 
             mesh_stage,
             meshes: vec![],
 
-            scheduler,
             elapsed: 0.0,
         };
 
@@ -87,6 +82,8 @@ impl DingusApp {
         );
 
         app.meshes.push(dingus);
+
+        app.record();
 
         app
     }
@@ -264,6 +261,54 @@ impl DingusApp {
             descriptor_set,
         }
     }
+
+    fn record(&mut self) {
+        self.command_buffer.begin().unwrap();
+
+        self.mesh_stage.render_stage.bind(&self.command_buffer);
+
+        self.mesh_stage.render_stage.set_descriptor_set(
+            &self.command_buffer,
+            0,
+            &self.mesh_stage.global_descriptor_set,
+        );
+
+        for mesh in &self.meshes {
+            self.mesh_stage.render_stage.set_descriptor_set(
+                &self.command_buffer,
+                1,
+                &mesh.descriptor_set,
+            );
+
+            mesh.vertex_buffer.draw_instanced(&self.command_buffer, 1);
+        }
+
+        self.mesh_stage
+            .render_stage
+            .end_render_pass(&self.command_buffer);
+
+        let image_memory_barrier = VEImageMemoryBarrier {
+            image: self.mesh_stage.color_buffer.handle,
+            aspect: ImageAspectFlags::COLOR,
+            old_layout: ImageLayout::GENERAL,
+            new_layout: ImageLayout::GENERAL,
+            src_access: AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dst_access: AccessFlags::TRANSFER_READ | AccessFlags::SHADER_READ,
+        };
+        let image_memory_barrier = image_memory_barrier.build();
+
+        submit_barriers(
+            &self.toolkit.device,
+            &self.command_buffer,
+            PipelineStageFlags::ALL_GRAPHICS,
+            PipelineStageFlags::ALL_COMMANDS,
+            &[],
+            &[],
+            &[image_memory_barrier],
+        );
+
+        self.command_buffer.end().unwrap();
+    }
 }
 
 #[allow(clippy::unwrap_used)]
@@ -273,34 +318,48 @@ impl App for DingusApp {
         unsafe {
             pointer.write(self.elapsed);
         }
-        // self.mesh_stage.uniform_buffer.unmap().unwrap();
-
-        self.mesh_stage.render_stage.begin_recording().unwrap();
-
-        self.mesh_stage
-            .render_stage
-            .set_descriptor_set(0, &self.mesh_stage.global_descriptor_set);
-
-        for mesh in &self.meshes {
-            self.mesh_stage
-                .render_stage
-                .set_descriptor_set(1, &mesh.descriptor_set);
-
-            self.mesh_stage
-                .render_stage
-                .draw_instanced(&mesh.vertex_buffer, 1);
-        }
-
-        self.mesh_stage.render_stage.end_recording().unwrap();
-
-        self.scheduler.run().unwrap();
 
         self.elapsed += 0.001;
+
+        let mut swapchain = self.toolkit.swapchain.lock().unwrap();
+        let blit_done_semaphore = swapchain.blit_done_semaphore.clone();
+
+        {
+            let queue = self
+                .toolkit
+                .queue
+                .lock()
+                .map_err(|_| VEImageError::QueueLockingFailed)
+                .unwrap();
+
+            self.command_buffer
+                .submit(
+                    &queue,
+                    vec![blit_done_semaphore.clone()],
+                    vec![self.frame_done_semaphore.clone()],
+                )
+                .unwrap();
+        }
+
+        swapchain
+            .blit(
+                &self.mesh_stage.color_buffer,
+                vec![self.frame_done_semaphore.clone()],
+            )
+            .unwrap();
 
         self.window
             .lock()
             .unwrap()
             .set_title(format!("{}", self.elapsed).as_str());
+
+        self.toolkit
+            .queue
+            .lock()
+            .map_err(|_| VEImageError::QueueLockingFailed)
+            .unwrap()
+            .wait_idle()
+            .unwrap();
     }
 
     fn on_window_event(&mut self, _: WindowEvent) {}

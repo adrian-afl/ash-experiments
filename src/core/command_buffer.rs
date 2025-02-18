@@ -60,8 +60,25 @@ impl VECommandBuffer {
         })
     }
 
-    pub fn begin(&self, flags: CommandBufferUsageFlags) -> Result<(), VECommandBufferError> {
+    pub fn begin_with_flags(
+        &self,
+        flags: CommandBufferUsageFlags,
+    ) -> Result<(), VECommandBufferError> {
         let begin_info = vk::CommandBufferBeginInfo::default().flags(flags);
+
+        unsafe {
+            self.device
+                .device
+                .begin_command_buffer(self.handle, &begin_info)
+                .map_err(VECommandBufferError::BeginFailed)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn begin(&self) -> Result<(), VECommandBufferError> {
+        let begin_info =
+            vk::CommandBufferBeginInfo::default().flags(CommandBufferUsageFlags::empty());
 
         unsafe {
             self.device

@@ -6,7 +6,7 @@ use crate::core::memory_properties::{get_memory_properties_flags, VEMemoryProper
 use crate::memory::memory_chunk::{VEMemoryChunkError, VESingleAllocation};
 use crate::memory::memory_manager::{VEMemoryManager, VEMemoryManagerError};
 use ash::vk;
-use ash::vk::{Buffer, BufferCreateInfo, CommandBufferUsageFlags, SharingMode};
+use ash::vk::{Buffer, BufferCreateInfo, SharingMode};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -146,9 +146,31 @@ impl VEBuffer {
         size: u64,
     ) -> Result<(), VEBufferError> {
         let command_buffer = VECommandBuffer::new(self.device.clone(), self.command_pool.clone())?;
-        //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        command_buffer.begin(CommandBufferUsageFlags::empty())?;
+        command_buffer.begin()?;
 
+        self.copy_to_cmd(&command_buffer, target, src_offset, dst_offset, size);
+
+        command_buffer.end()?;
+
+        let queue = &self
+            .queue
+            .lock()
+            .map_err(|_| VEBufferError::QueueLockingFailed)?;
+
+        command_buffer.submit(queue, vec![], vec![])?;
+        queue.wait_idle()?;
+
+        Ok(())
+    }
+
+    pub fn copy_to_cmd(
+        &self,
+        command_buffer: &VECommandBuffer,
+        target: &VEBuffer,
+        src_offset: u64,
+        dst_offset: u64,
+        size: u64,
+    ) {
         let region = vk::BufferCopy::default()
             .size(size)
             .src_offset(src_offset)
@@ -162,18 +184,6 @@ impl VEBuffer {
                 &[region],
             );
         }
-
-        command_buffer.end()?;
-
-        let queue = &self
-            .queue
-            .lock()
-            .map_err(|_| VEBufferError::QueueLockingFailed)?;
-
-        command_buffer.submit(queue, vec![], vec![])?;
-        queue.wait_idle()?;
-
-        Ok(())
     }
 }
 

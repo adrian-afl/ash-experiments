@@ -1,5 +1,4 @@
-use crate::core::command_buffer::{VECommandBuffer, VECommandBufferError};
-use crate::core::command_pool::VECommandPool;
+use crate::core::command_buffer::VECommandBuffer;
 use crate::core::descriptor_set::VEDescriptorSet;
 use crate::core::descriptor_set_layout::VEDescriptorSetLayout;
 use crate::core::device::VEDevice;
@@ -9,7 +8,6 @@ use crate::graphics::framebuffer::{VEFrameBuffer, VEFrameBufferError};
 use crate::graphics::graphics_pipeline::{VEGraphicsPipeline, VEGraphicsPipelineError};
 use crate::graphics::renderpass::{VERenderPass, VERenderPassError};
 use crate::graphics::vertex_attributes::VertexAttribFormat;
-use crate::graphics::vertex_buffer::VEVertexBuffer;
 use ash::vk;
 use std::sync::Arc;
 use thiserror::Error;
@@ -18,9 +16,6 @@ use thiserror::Error;
 pub enum VERenderStageError {
     #[error("graphics pipeline error")]
     GraphicsPipelineError(#[from] VEGraphicsPipelineError),
-
-    #[error("command buffer error")]
-    CommandBufferError(#[from] VECommandBufferError),
 
     #[error("render pass error")]
     RenderPassError(#[from] VERenderPassError),
@@ -34,7 +29,6 @@ static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::GRAPHICS;
 pub struct VERenderStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEGraphicsPipeline>,
-    pub command_buffer: VECommandBuffer,
     render_pass: VERenderPass,
     framebuffer: VEFrameBuffer,
     viewport_width: u32,
@@ -81,7 +75,6 @@ fn get_cull_flags(mode: VECullMode) -> vk::CullModeFlags {
 impl VERenderStage {
     pub fn new(
         device: Arc<VEDevice>,
-        command_pool: Arc<VECommandPool>,
         viewport_width: u32,
         viewport_height: u32,
         attachments: &[&VEAttachment],
@@ -118,16 +111,12 @@ impl VERenderStage {
 
         let clear_values = attachments
             .iter()
-            .map(|a| match a.clear {
-                None => vk::ClearValue::default(),
-                Some(c) => c,
-            })
+            .map(|a| a.clear.unwrap_or_else(|| vk::ClearValue::default()))
             .collect();
 
         Ok(VERenderStage {
             device: device.clone(),
             pipeline: Arc::new(pipeline),
-            command_buffer: VECommandBuffer::new(device, command_pool.clone())?,
             render_pass,
             framebuffer,
             viewport_width,
@@ -136,10 +125,15 @@ impl VERenderStage {
         })
     }
 
-    pub fn set_descriptor_set(&self, index: u32, set: &VEDescriptorSet) {
+    pub fn set_descriptor_set(
+        &self,
+        command_buffer: &VECommandBuffer,
+        index: u32,
+        set: &VEDescriptorSet,
+    ) {
         unsafe {
             self.device.device.cmd_bind_descriptor_sets(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.layout,
                 index,
@@ -149,10 +143,7 @@ impl VERenderStage {
         }
     }
 
-    pub fn begin_recording(&self) -> Result<(), VERenderStageError> {
-        self.command_buffer
-            .begin(vk::CommandBufferUsageFlags::empty())?;
-
+    pub fn bind(&self, command_buffer: &VECommandBuffer) {
         let rect = vk::Rect2D::default()
             .offset(vk::Offset2D::default())
             .extent(
@@ -169,45 +160,24 @@ impl VERenderStage {
 
         unsafe {
             self.device.device.cmd_begin_render_pass(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 &render_pass_begin_info,
                 vk::SubpassContents::INLINE,
             );
 
             self.device.device.cmd_bind_pipeline(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.pipeline,
             );
         }
-        Ok(())
     }
 
-    pub fn end_recording(&self) -> Result<(), VERenderStageError> {
+    pub fn end_render_pass(&self, command_buffer: &VECommandBuffer) {
         unsafe {
             self.device
                 .device
-                .cmd_end_render_pass(self.command_buffer.handle);
-        }
-        self.command_buffer.end()?;
-        Ok(())
-    }
-
-    pub fn draw_instanced(&self, vertex_buffer: &VEVertexBuffer, instances: u32) {
-        unsafe {
-            self.device.device.cmd_bind_vertex_buffers(
-                self.command_buffer.handle,
-                0,
-                &[vertex_buffer.buffer.buffer],
-                &[0],
-            );
-            self.device.device.cmd_draw(
-                self.command_buffer.handle,
-                vertex_buffer.vertex_count,
-                instances,
-                0,
-                0,
-            );
+                .cmd_end_render_pass(command_buffer.handle);
         }
     }
 }

@@ -8,7 +8,6 @@ use crate::core::descriptor_set_layout::{
 use crate::core::device::{VEDevice, VEDeviceError};
 use crate::core::main_device_queue::VEMainDeviceQueue;
 use crate::core::memory_properties::VEMemoryProperties;
-use crate::core::scheduler::VEScheduler;
 use crate::core::semaphore::{VESemaphore, VESemaphoreError};
 use crate::core::shader_module::{VEShaderModule, VEShaderModuleError, VEShaderModuleType};
 use crate::graphics::attachment::VEAttachment;
@@ -314,7 +313,7 @@ impl VEToolkit {
     }
 
     pub fn create_vertex_buffer(&self, buffer: VEBuffer, vertex_count: u32) -> VEVertexBuffer {
-        VEVertexBuffer::new(buffer, vertex_count)
+        VEVertexBuffer::new(self.device.clone(), buffer, vertex_count)
     }
 
     pub fn create_vertex_buffer_from_file(
@@ -374,7 +373,6 @@ impl VEToolkit {
     ) -> Result<VERenderStage, VERenderStageError> {
         VERenderStage::new(
             self.device.clone(),
-            self.command_pool.clone(),
             viewport_width,
             viewport_height,
             attachments,
@@ -384,15 +382,6 @@ impl VEToolkit {
             vertex_attributes,
             primitive_topology,
             cull_mode,
-        )
-    }
-
-    pub fn create_scheduler(&self, layers_count: u8) -> VEScheduler {
-        VEScheduler::new(
-            self.device.clone(),
-            self.swapchain.clone(),
-            self.queue.clone(),
-            layers_count,
         )
     }
 }

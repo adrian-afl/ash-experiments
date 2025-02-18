@@ -9,8 +9,7 @@ use std::sync::{Arc, Mutex};
 
 pub fn transition_image_layout(
     device: Arc<VEDevice>,
-    command_pool: Arc<VECommandPool>,
-    queue: Arc<Mutex<VEMainDeviceQueue>>,
+    command_buffer: &VECommandBuffer,
     image_handle: vk::Image,
     aspect: vk::ImageAspectFlags,
     current_layout: vk::ImageLayout,
@@ -84,10 +83,6 @@ pub fn transition_image_layout(
         }
     }
 
-    let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone())?;
-    //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-    command_buffer.begin(CommandBufferUsageFlags::empty())?;
-
     image_memory_barrier(
         device,
         &command_buffer,
@@ -100,13 +95,6 @@ pub fn transition_image_layout(
         source_stage,
         destination_stage,
     );
-
-    command_buffer.end()?;
-
-    let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
-
-    command_buffer.submit(&queue, vec![], vec![])?;
-    queue.wait_idle()?;
 
     Ok(())
 }

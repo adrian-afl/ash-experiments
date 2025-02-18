@@ -58,11 +58,15 @@ impl VEImage {
             // staging_buffer.unmap()?;
         }
 
-        result.transition_layout(result.current_layout, vk::ImageLayout::TRANSFER_DST_OPTIMAL)?;
-
         let command_buffer = VECommandBuffer::new(device.clone(), command_pool.clone())?;
         //command_buffer.begin(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        command_buffer.begin(CommandBufferUsageFlags::empty())?;
+        command_buffer.begin()?;
+
+        result.transition_layout(
+            &command_buffer,
+            result.current_layout,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        )?;
 
         let region = vk::BufferImageCopy::default()
             .image_subresource(
@@ -89,19 +93,18 @@ impl VEImage {
             );
         }
 
-        command_buffer.end()?;
-
-        {
-            let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
-
-            command_buffer.submit(&queue, vec![], vec![])?;
-            queue.wait_idle()?;
-        }
-
         result.transition_layout(
+            &command_buffer,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::GENERAL,
         )?;
+
+        command_buffer.end()?;
+
+        let queue = queue.lock().map_err(|_| VEImageError::QueueLockingFailed)?;
+
+        command_buffer.submit(&queue, vec![], vec![])?;
+        queue.wait_idle()?;
 
         Ok(result)
     }

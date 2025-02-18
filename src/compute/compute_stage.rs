@@ -24,7 +24,6 @@ static BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
 pub struct VEComputeStage {
     device: Arc<VEDevice>,
     pipeline: Arc<VEComputePipeline>,
-    pub command_buffer: VECommandBuffer,
 }
 
 impl VEComputeStage {
@@ -38,14 +37,18 @@ impl VEComputeStage {
         Ok(VEComputeStage {
             device: device.clone(),
             pipeline: Arc::new(pipeline),
-            command_buffer: VECommandBuffer::new(device, command_pool.clone())?,
         })
     }
 
-    pub fn set_descriptor_set(&self, index: u32, set: &VEDescriptorSet) {
+    pub fn set_descriptor_set(
+        &self,
+        command_buffer: &VECommandBuffer,
+        index: u32,
+        set: &VEDescriptorSet,
+    ) {
         unsafe {
             self.device.device.cmd_bind_descriptor_sets(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.layout,
                 index,
@@ -55,28 +58,26 @@ impl VEComputeStage {
         }
     }
 
-    pub fn begin_recording(&self) -> Result<(), VEComputeStageError> {
-        self.command_buffer
-            .begin(CommandBufferUsageFlags::empty())?;
+    pub fn bind(&self, command_buffer: &VECommandBuffer) {
         unsafe {
             self.device.device.cmd_bind_pipeline(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 BIND_POINT,
                 self.pipeline.pipeline,
             );
         }
-        Ok(())
     }
 
-    pub fn end_recording(&self) -> Result<(), VEComputeStageError> {
-        self.command_buffer.end()?;
-        Ok(())
-    }
-
-    pub fn dispatch(&self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+    pub fn dispatch(
+        &self,
+        command_buffer: &VECommandBuffer,
+        group_count_x: u32,
+        group_count_y: u32,
+        group_count_z: u32,
+    ) {
         unsafe {
             self.device.device.cmd_dispatch(
-                self.command_buffer.handle,
+                command_buffer.handle,
                 group_count_x,
                 group_count_y,
                 group_count_z,

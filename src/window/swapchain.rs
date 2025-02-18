@@ -30,6 +30,9 @@ pub enum VESwapchainError {
     #[error("queue locking failed")]
     QueueLockingFailed,
 
+    #[error("queue wait idle failed")]
+    QueueWaitIdleFailed,
+
     #[error("semaphore error")]
     SemaphoreError(#[from] VESemaphoreError),
 
@@ -215,12 +218,18 @@ impl VESwapchain {
                 surface_resolution.height,
                 surface_format.format,
                 present_images_raw[i],
-            )?)
+            )?);
         }
         Ok((swapchain, swapchain_loader, present_images))
     }
 
     pub fn recreate(&mut self, new_size: PhysicalSize<u32>) -> Result<(), VESwapchainError> {
+        self.queue
+            .lock()
+            .map_err(|_| VEImageError::QueueLockingFailed)?
+            .wait_idle()
+            .map_err(|_| VESwapchainError::QueueWaitIdleFailed)?;
+
         self.present_images.clear();
 
         unsafe {
@@ -251,6 +260,12 @@ impl VESwapchain {
             .lock()
             .map_err(|_| VESwapchainError::AcquireSemaphoreLockingFailed)?
             .recreate()?;
+
+        self.queue
+            .lock()
+            .map_err(|_| VEImageError::QueueLockingFailed)?
+            .wait_idle()
+            .map_err(|_| VESwapchainError::QueueWaitIdleFailed)?;
         Ok(())
     }
 
@@ -279,11 +294,13 @@ impl VESwapchain {
 
         wait_handles.push(ack_semaphore.clone());
 
-        self.present_images[acquired as usize]
-            .transition_layout(vk::ImageLayout::PRESENT_SRC_KHR, vk::ImageLayout::GENERAL)?;
+        self.present_command_buffer.begin()?; // TODO try to remove this flag
 
-        self.present_command_buffer
-            .begin(CommandBufferUsageFlags::empty())?; // TODO try to remove this flag
+        self.present_images[acquired as usize].transition_layout(
+            &self.present_command_buffer,
+            vk::ImageLayout::PRESENT_SRC_KHR,
+            vk::ImageLayout::GENERAL,
+        )?;
 
         let region = vk::ImageBlit::default()
             .src_subresource(
@@ -325,6 +342,12 @@ impl VESwapchain {
             )
         }
 
+        self.present_images[acquired as usize].transition_layout(
+            &self.present_command_buffer,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::PRESENT_SRC_KHR,
+        )?;
+
         self.present_command_buffer.end()?;
 
         {
@@ -339,9 +362,6 @@ impl VESwapchain {
                 vec![blit_semaphore.clone()],
             )?;
         }
-
-        self.present_images[acquired as usize]
-            .transition_layout(vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR)?;
 
         self.present(&[], acquired)?;
 

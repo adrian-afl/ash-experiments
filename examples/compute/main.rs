@@ -51,12 +51,17 @@ impl ComputeApp {
         let set = set_layout.create_descriptor_set().unwrap();
         set.bind_buffer(0, &buffer).unwrap();
 
-        compute_stage.begin_recording().unwrap();
-        compute_stage.set_descriptor_set(0, &set);
-        compute_stage.dispatch(4, 1, 1);
-        compute_stage.end_recording().unwrap();
-        compute_stage
-            .command_buffer
+        let command_buffer = toolkit.create_command_buffer().unwrap();
+
+        command_buffer.begin().unwrap();
+
+        compute_stage.bind(&command_buffer);
+        compute_stage.set_descriptor_set(&command_buffer, 0, &set);
+        compute_stage.dispatch(&command_buffer, 4, 1, 1);
+
+        command_buffer.end().unwrap();
+
+        command_buffer
             .submit(&toolkit.queue.lock().unwrap(), vec![], vec![])
             .unwrap();
 
